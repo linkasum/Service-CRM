@@ -1,0 +1,2 @@
+# qwencrm
+crm_fastapi
