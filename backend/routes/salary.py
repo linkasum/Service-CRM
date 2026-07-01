@@ -324,7 +324,7 @@ def employees_salary_report(
             accrued_query = accrued_query.where(SalaryRecord.period_start >= date_from)
         if date_to:
             end_of_day = datetime.combine(date_to.date(), time.max)
-            accrued_query = accrued_query.where(SalaryRecord.period_end <= end_of_day)
+            accrued_query = accrued_query.where(SalaryRecord.period_start <= end_of_day)
         
         total_accrued = session.exec(accrued_query).first() or 0
         
@@ -337,7 +337,7 @@ def employees_salary_report(
             deducted_query = deducted_query.where(SalaryRecord.period_start >= date_from)
         if date_to:
             end_of_day = datetime.combine(date_to.date(), time.max)
-            deducted_query = deducted_query.where(SalaryRecord.period_end <= end_of_day)
+            deducted_query = deducted_query.where(SalaryRecord.period_start <= end_of_day)
         
         total_deducted = session.exec(deducted_query).first() or 0
         # deducted обычно отрицательный, делаем положительным для отображения
@@ -387,7 +387,7 @@ def employee_salary_detail(
         # Включаем весь день до 23:59:59
         from datetime import time, timedelta
         end_of_day = datetime.combine(date_to.date(), time.max)
-        query = query.where(SalaryRecord.period_end <= end_of_day)
+        query = query.where(SalaryRecord.period_start <= end_of_day)
     
     records = session.exec(query).all()
     

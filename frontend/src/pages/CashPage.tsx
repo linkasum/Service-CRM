@@ -48,6 +48,8 @@ const CashPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('ready')
   const [selectedShift, setSelectedShift] = useState<any>(null)
   const [shiftTransactions, setShiftTransactions] = useState<any[]>([])
+  const [orderSearch, setOrderSearch] = useState('')
+  const [orderList, setOrderList] = useState<any[]>([])
   const [transactionsLoading, setTransactionsLoading] = useState(false)
   const [monthlySummary, setMonthlySummary] = useState<{ month: string; cash_total: number; card_total: number; grand_total: number; refund_total: number; net_total: number; current_cash: number } | null>(null)
 
@@ -95,6 +97,15 @@ const CashPage: React.FC = () => {
       const res = await api.get('/cash/monthly-summary')
       setMonthlySummary(res.data)
     } catch { setMonthlySummary(null) }
+  }
+
+  const searchOrders = async (q: string) => {
+    setOrderSearch(q)
+    if (!q || q.length < 2) { setOrderList([]); return }
+    try {
+      const res = await api.get(`/orders?search=${q}&limit=20`)
+      setOrderList(Array.isArray(res.data) ? res.data : res.data?.items || [])
+    } catch { setOrderList([]) }
   }
 
   const loadShiftHistory = async () => {
@@ -517,6 +528,21 @@ const CashPage: React.FC = () => {
           <Form.Item label="Сумма" name="amount" rules={[{required: true, message: 'Введите сумму'}]}>
             <InputNumber min={txType === 'adjustment' ? undefined : 0.01} style={{width: '100%'}} placeholder="0.00" />
           </Form.Item>
+          {txType === 'income' && (
+            <Form.Item label="Заказ (для начисления ЗП мастеру)" name="order_id">
+              <Select
+                showSearch
+                placeholder="Выберите заказ или оставьте пустым"
+                filterOption={false}
+                onSearch={searchOrders}
+                allowClear
+                options={orderList.map((o: any) => ({
+                  value: o.id,
+                  label: `#${o.id} ${o.client_name || ''} — ${o.device_model || ''} (${o.master_username || 'без мастера'})`
+                }))}
+              />
+            </Form.Item>
+          )}
           <Form.Item label="Комментарий" name="comment">
             <Input placeholder="Описание операции..." />
           </Form.Item>

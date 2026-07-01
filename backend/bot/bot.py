@@ -34,6 +34,7 @@ from core.security import get_password_hash, verify_password
 from models.individual_permission import IndividualPermission
 from core.telegram_auth import verify_telegram_link_token
 from models.cash_shift import CashShift
+from models.cash_transaction import CashTransaction
 from models.custom_status import CustomStatus
 from models.order import Order
 from models.order_comment import OrderComment
@@ -197,6 +198,7 @@ def main_keyboard(user: dict) -> ReplyKeyboardMarkup:
         rows.append(third_row)
 
     if user["role"] == "master":
+        query = query.where(Order.master_id == user["id"])
         rows.append([KeyboardButton(text="💰 Зарплата")])
 
     fourth_row = []
@@ -304,7 +306,10 @@ def can_access_order(user: dict, order: Order) -> bool:
 
 
 def orders_query_for_user(user: dict):
-    query = select(Order).where(Order.status.not_in(["issued", "issued_br", "cancelled"]), Order.total_cost > 0)
+    exclude = ["issued", "issued_br", "cancelled"]
+    if user["role"] == "master":
+        exclude.append("ready_pickup")
+    query = select(Order).where(Order.status.not_in(exclude))
     if user["role"] == "master":
         query = query.where(Order.master_id == user["id"])
     return query.order_by(Order.created_at.desc())
@@ -1150,16 +1155,20 @@ async def salary_cmd(message: types.Message):
             select(SalaryRecord).where(
                 SalaryRecord.user_id == user["id"],
                 SalaryRecord.period_start >= period_start,
-                SalaryRecord.period_end <= period_end,
+                SalaryRecord.period_start <= period_end,
             )
         ).all()
     accrued = sum(record.calculated_amount for record in records if record.status == "accrued")
+    deducted = sum(abs(record.calculated_amount) for record in records if record.status == "deducted")
     paid = sum(abs(record.calculated_amount) for record in records if record.status == "paid")
+    net = accrued - deducted
+    balance = net - paid
     await message.answer(
         f"Зарплата {period_start.strftime('%d.%m')}-{period_end.strftime('%d.%m')}:\n"
         f"Начислено: {rub(accrued)}\n"
+        f"Удержано: {rub(deducted)}\n"
         f"Выплачено: {rub(paid)}\n"
-        f"Остаток: {rub(max(accrued - paid, 0))}\n"
+        f"Остаток: {rub(max(balance, 0))}\n"
         f"Записей: {len(records)}"
     )
 
@@ -1215,7 +1224,7 @@ async def dashboard_cmd(message: types.Message):
     with Session(engine) as session:
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         today_count = session.exec(select(func.count(Order.id)).where(Order.created_at >= today)).one()
-        active_count = session.exec(select(func.count(Order.id)).where(Order.status.not_in(["issued", "issued_br", "cancelled"]), Order.total_cost > 0)).one()
+        active_count = session.exec(select(func.count(Order.id)).where(Order.status.not_in(["issued", "issued_br", "cancelled"]))).one()
         repair_count = session.exec(select(func.count(Order.id)).where(Order.status == "repair")).one()
         ready_count = session.exec(select(func.count(Order.id)).where(Order.status == "ready")).one()
     await message.answer(

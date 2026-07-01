@@ -358,6 +358,23 @@ def create_transaction(
     
     logger.info(f"Транзакция: {tx_type.value} {amount}₽ в смене #{shift.id}")
     
+    # Авто-начисление ЗП если приход привязан к заказу с мастером
+    if tx_type == TransactionType.income and tx.order_id and amount > 0:
+        order = session.get(Order, tx.order_id)
+        if order and order.master_id:
+            salary_amount = round(amount * 0.4)
+            salary_record = SalaryRecord(
+                user_id=order.master_id,
+                order_id=tx.order_id,
+                calculated_amount=salary_amount,
+                status="accrued",
+                period_start=datetime.utcnow().replace(day=1),
+                period_end=datetime.utcnow(),
+                comment=f"Авто: приход #{tx.id}",
+            )
+            session.add(salary_record)
+            session.commit()
+    
     return {
         "id": tx.id,
         "transaction_type": tx.transaction_type.value,
