@@ -23,7 +23,8 @@ import {
   getParts, partMovement,
   getServices, createService as createOrderService,
   getOrderStatuses,
-  recalculateOrderSalary
+  recalculateOrderSalary,
+  getCategories, createCategory
 } from '../api'
 import api from '../api'
 import { Order, OrderStatus, ORDER_STATUS_CONFIG } from '../types'
@@ -126,6 +127,8 @@ const OrderDetailPage: React.FC = () => {
   const [users, setUsers] = useState<any[]>([])
   const [statusList, setStatusList] = useState<any[]>(DEFAULT_STATUSES)
   const [ageGroups, setAgeGroups] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
+  const [categorySearch, setCategorySearch] = useState('')
   const [sources, setSources] = useState<any[]>([])
 
   // Загружаем статусы из БД при старте
@@ -133,6 +136,7 @@ const OrderDetailPage: React.FC = () => {
     loadStatuses()
     loadAgeGroups()
     loadSources()
+    loadCategories()
   }, [])
 
   const loadStatuses = async () => {
@@ -179,6 +183,18 @@ const OrderDetailPage: React.FC = () => {
       const data = Array.isArray(res.data) ? res.data : (res.data.items || [])
       setSources(data.map((s: any) => ({ value: s.name || s.value, label: s.name || s.label || s.value })))
     } catch { /* API недоступен — используем пустой список */ }
+  }
+
+  const loadCategories = async () => {
+    try { const data = await getCategories(); setCategories(data || []) } catch {}
+  }
+
+  const handleCreateCategory = async (name: string) => {
+    if (!name.trim()) return
+    try {
+      await createCategory(name.trim())
+      loadCategories()
+    } catch {}
   }
 
   const loadOrder = async () => {
@@ -1140,17 +1156,38 @@ const OrderDetailPage: React.FC = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item label="Внешний вид" name="appearance">
-                <AutoComplete placeholder="б/у, новый, с царапинами" options={[
-                  {value:'Б/У'},{value:'Новый'},{value:'Как новый'},{value:'С царапинами'},{value:'С повреждениями'}
-                ]} />
+                <Select
+                  options={[
+                    { value: 'Б/У', label: 'Б/У' },
+                    { value: 'Новый', label: 'Новый' },
+                    { value: 'Как новый', label: 'Как новый' },
+                    { value: 'С царапинами', label: 'С царапинами' },
+                    { value: 'С повреждениями', label: 'С повреждениями' },
+                    { value: 'Следы эксплуатации', label: 'Следы эксплуатации' },
+                  ]}
+                  allowClear placeholder="—"
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="Вид устройства" name="device_category">
-                <AutoComplete placeholder="Пылесос, Телефон, Ноутбук..." options={[
-                  {value:'Телефон'},{value:'Ноутбук'},{value:'Планшет'},{value:'Телевизор'},{value:'Пылесос'},
-                  {value:'Кофемашина'},{value:'Микроволновка'},{value:'Фен'},{value:'Утюг'},{value:'Другое'}
-                ]} />
+                <Select
+                  options={categories.map((c: any) => ({ value: c.name, label: c.name }))}
+                  showSearch
+                  filterOption={(input: string, option: any) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  onSearch={setCategorySearch}
+                  notFoundContent={
+                    categorySearch ? (
+                      <div style={{ padding: 8, textAlign: 'center' }}>
+                        <Button type="link" onClick={() => handleCreateCategory(categorySearch)}>
+                          + Создать "{categorySearch}"
+                        </Button>
+                      </div>
+                    ) : null
+                  }
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
