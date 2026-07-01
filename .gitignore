@@ -1,0 +1,55 @@
+# Database dumps
+*.dump
+*.sql.gz
+*.backup
+
+# Backups
+backups/
+qwencrm_full.dump
+qwencrm_project.tar.gz
+
+# Excel data files  
+*.xlsx
+!backend/*.xlsx
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Docker
+docker-compose.override.yml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Documents (uploaded files)
+documents/
+
+# Sensitive
+*qwencrm_full*
+*backup*
+*.dump

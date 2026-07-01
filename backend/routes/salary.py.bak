@@ -1,0 +1,576 @@
+"""
+Маршруты: Зарплаты — формулы и фиксированные суммы
+"""
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlmodel import Session, select, func
+from datetime import datetime, time
+
+from core.database import get_session
+from core.security import get_current_user
+from models.user import User
+from models.role import Role
+from models.salary_config import SalaryConfig, SalaryType, SalaryPeriod
+from models.salary_record import SalaryRecord
+from models.order import Order
+from models.cash_shift import CashShift
+from models.cash_transaction import CashTransaction, TransactionType
+from core.logging import logger
+import re
+
+router = APIRouter(prefix="/api/salary", tags=["Зарплаты"])
+
+
+@router.get("/config", summary="Список формул/конфигов зарплаты")
+def get_salary_configs(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    configs = session.exec(select(SalaryConfig).order_by(SalaryConfig.created_at.desc())).all()
+    result = []
+    for c in configs:
+        ctype = c.config_type.value if hasattr(c.config_type, 'value') else str(c.config_type)
+        period = c.period.value if hasattr(c.period, 'value') else str(c.period)
+        result.append({
+            "id": c.id,
+            "name": c.name or c.formula_string or "",
+            "config_type": ctype,
+            "formula_string": c.formula_string,
+            "fixed_amount": c.fixed_amount,
+            "period": period,
+            "description": c.description,
+            "is_active": c.is_active,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        })
+    return result
+
+
+@router.post("/config", summary="Создать конфигурацию зарплаты")
+def create_salary_config(
+    data: dict,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    config_type = data.get("config_type", "formula")
+    
+    if config_type == "formula" and not data.get("formula_string"):
+        raise HTTPException(status_code=400, detail="Для формулы нужна formula_string")
+    if config_type == "fixed" and not data.get("fixed_amount"):
+        raise HTTPException(status_code=400, detail="Для фиксированной нужна fixed_amount")
+    
+    # Теперь можно создавать неограниченное количество активных формул
+    # Убрана логика деактивации других формул
+    
+    config = SalaryConfig(
+        name=data.get("name", ""),
+        config_type=SalaryType(config_type),
+        formula_string=data.get("formula_string"),
+        fixed_amount=data.get("fixed_amount"),
+        period=SalaryPeriod(data.get("period", "per_order")),
+        description=data.get("description", ""),
+        is_active=data.get("is_active", False),
+    )
+    
+    session.add(config)
+    session.commit()
+    session.refresh(config)
+    
+    return {
+        "id": config.id,
+        "name": config.name,
+        "config_type": config.config_type.value,
+        "formula_string": config.formula_string,
+        "fixed_amount": config.fixed_amount,
+        "period": config.period.value,
+        "is_active": config.is_active,
+    }
+
+
+@router.post("/config/{config_id}/activate", summary="Активировать конфигурацию")
+def activate_config(
+    config_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Активировать конфигурацию (теперь можно активировать неограниченное количество)"""
+    config = session.get(SalaryConfig, config_id)
+    if not config:
+        raise HTTPException(status_code=404, detail="Конфигурация не найдена")
+    
+    # Просто активируем, не деактивируя другие
+    # Теперь можно иметь неограниченное количество активных формул
+    config.is_active = True
+    session.add(config)
+    session.commit()
+    
+    return {"message": f"Активирована: {config.name}"}
+
+
+@router.delete("/config/{config_id}", summary="Удалить конфигурацию")
+def delete_config(
+    config_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    config = session.get(SalaryConfig, config_id)
+    if not config:
+        raise HTTPException(status_code=404, detail="Конфигурация не найдена")
+    
+    session.delete(config)
+    session.commit()
+    return {"message": f"Удалена: {config.name}"}
+
+
+@router.post("/records", summary="Создать записи зарплаты за период")
+def create_salary_records(
+    data: dict,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    date_from = data.get("date_from")
+    date_to = data.get("date_to")
+    
+    if not date_from or not date_to:
+        raise HTTPException(status_code=400, detail="Нужны date_from и date_to")
+    
+    orders = session.exec(
+        select(Order).where(
+            Order.status == "issued",
+            Order.issued_at >= date_from,
+            Order.issued_at <= date_to + " 23:59:59",
+            Order.master_id.isnot(None),
+        )
+    ).all()
+    
+    master_orders: dict = {}
+    for o in orders:
+        if o.master_id not in master_orders:
+            master_orders[o.master_id] = []
+        master_orders[o.master_id].append(o)
+    
+    created = 0
+    for master_id, m_orders in master_orders.items():
+        total_cost = sum(o.total_cost or 0 for o in m_orders)
+        parts_cost = sum(o.parts_cost or 0 for o in m_orders)
+        
+        user = session.get(User, master_id)
+        config = None
+        if user and user.salary_config_id:
+            config = session.get(SalaryConfig, user.salary_config_id)
+        
+        if not config:
+            config = session.exec(
+                select(SalaryConfig).where(
+                    SalaryConfig.config_type == SalaryType.formula,
+                    SalaryConfig.is_active == True,
+                )
+            ).first()
+        
+        salary_amount = 0
+        if config:
+            if config.config_type == SalaryType.fixed:
+                salary_amount = config.fixed_amount or 0
+            else:
+                formula = config.formula_string or "0"
+                formula = formula.replace("{total_cost}", str(total_cost))
+                formula = formula.replace("{parts_cost}", str(parts_cost))
+                formula = formula.replace("{total}", str(total_cost))
+                formula = formula.replace("{parts}", str(parts_cost))
+                formula = formula.replace("{orders_count}", str(len(m_orders)))
+                formula = formula.replace("{base_salary}", str(config.fixed_amount or 0))
+                
+                try:
+                    sanitized = re.sub(r'[^0-9+\-*/().%\s]', '', formula)
+                    salary_amount = round(eval(sanitized))
+                except:
+                    salary_amount = 0
+        
+        from datetime import datetime as dt
+        record = SalaryRecord(
+            user_id=master_id,
+            period_start=dt.fromisoformat(date_from) if isinstance(date_from, str) else date_from,
+            period_end=dt.fromisoformat(date_to) if isinstance(date_to, str) else date_to,
+            calculated_amount=salary_amount,
+            status="accrued",
+        )
+        session.add(record)
+        created += 1
+    
+    session.commit()
+    return {"created": created, "total": len(master_orders)}
+
+
+@router.get("/records", summary="Список записей зарплаты")
+def get_salary_records(
+    user_id: Optional[int] = Query(None),
+    skip: int = Query(0),
+    limit: int = Query(100),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    query = select(SalaryRecord)
+    if user_id:
+        query = query.where(SalaryRecord.user_id == user_id)
+    
+    query = query.offset(skip).limit(limit).order_by(SalaryRecord.period_start.desc())
+    records = session.exec(query).all()
+    
+    result = []
+    for r in records:
+        user = session.get(User, r.user_id) if r.user_id else None
+        result.append({
+            "id": r.id,
+            "user_id": r.user_id,
+            "username": user.username if user else None,
+            "date_from": r.period_start.isoformat() if r.period_start else None,
+            "date_to": r.period_end.isoformat() if r.period_end else None,
+            "orders_count": 0,
+            "total_cost": 0,
+            "salary_amount": r.calculated_amount,
+            "status": r.status,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+    
+    return result
+
+
+@router.patch("/records/{record_id}", summary="Обновить статус записи")
+def update_salary_record(
+    record_id: int,
+    data: dict,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    record = session.get(SalaryRecord, record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    
+    if "status" in data:
+        record.status = data["status"]
+    
+    session.add(record)
+    session.commit()
+    
+    return {"id": record.id, "status": record.status}
+
+
+@router.get("/records/employees", summary="Список сотрудников с зарплатой за период")
+def employees_salary_report(
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Список сотрудников с общей суммой начислений за период.
+    Возвращает: user_id, username, role, total_accrued, total_deductions, net_amount.
+    """
+    # Получаем активных сотрудников с ролями
+    query = select(User, Role).join(Role, User.role_id == Role.id).where(User.is_active == True)
+    users = session.exec(query).all()
+    
+    result = []
+    for user, role in users:
+        # Пропускаем админов если нужно (можно настроить)
+        if role.name.lower() in ['admin', 'administrator']:
+            continue
+            
+        # Считаем начисления (accrued)
+        accrued_query = select(func.sum(SalaryRecord.calculated_amount)).where(
+            SalaryRecord.user_id == user.id,
+            SalaryRecord.status == 'accrued'
+        )
+        if date_from:
+            accrued_query = accrued_query.where(SalaryRecord.created_at >= date_from)
+        if date_to:
+            end_of_day = datetime.combine(date_to.date(), time.max)
+            accrued_query = accrued_query.where(SalaryRecord.created_at <= end_of_day)
+        
+        total_accrued = session.exec(accrued_query).first() or 0
+        
+        # Считаем удержания (deducted)
+        deducted_query = select(func.sum(SalaryRecord.calculated_amount)).where(
+            SalaryRecord.user_id == user.id,
+            SalaryRecord.status == 'deducted'
+        )
+        if date_from:
+            deducted_query = deducted_query.where(SalaryRecord.created_at >= date_from)
+        if date_to:
+            end_of_day = datetime.combine(date_to.date(), time.max)
+            deducted_query = deducted_query.where(SalaryRecord.created_at <= end_of_day)
+        
+        total_deducted = session.exec(deducted_query).first() or 0
+        # deducted обычно отрицательный, делаем положительным для отображения
+        total_deducted = abs(total_deducted) if total_deducted else 0
+        
+        net_amount = total_accrued - total_deducted
+        
+        result.append({
+            "user_id": user.id,
+            "username": user.username,
+            "role": role.name,
+            "total_accrued": round(total_accrued, 2),
+            "total_deductions": round(total_deducted, 2),
+            "net_amount": round(net_amount, 2),
+            "orders_count": session.exec(
+                select(func.count(SalaryRecord.order_id.distinct())).where(
+                    SalaryRecord.user_id == user.id,
+                    SalaryRecord.status == 'accrued'
+                )
+            ).first() or 0,
+        })
+    
+    # Сортируем по net_amount
+    result.sort(key=lambda x: x['net_amount'], reverse=True)
+    
+    return result
+
+
+@router.get("/records/employees/{user_id}", summary="Детализация зарплаты сотрудника")
+def employee_salary_detail(
+    user_id: int,
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Детализация начислений и удержаний конкретного сотрудника.
+    Возвращает список записей SalaryRecord с информацией о заказах.
+    """
+    query = select(SalaryRecord).where(SalaryRecord.user_id == user_id).order_by(SalaryRecord.created_at.desc())
+
+    if date_from:
+        # Включаем весь день с 00:00:00
+        query = query.where(SalaryRecord.created_at >= date_from)
+    if date_to:
+        # Включаем весь день до 23:59:59
+        from datetime import time, timedelta
+        end_of_day = datetime.combine(date_to.date(), time.max)
+        query = query.where(SalaryRecord.created_at <= end_of_day)
+    
+    records = session.exec(query).all()
+    
+    # Получаем имя сотрудника
+    user = session.get(User, user_id)
+    username = user.username if user else 'Unknown'
+
+    result = []
+    for rec in records:
+        order_info = None
+        if rec.order_id:
+            order = session.get(Order, rec.order_id)
+            if order:
+                order_info = {
+                    "id": order.id,
+                    "client_name": order.client_name,
+                    "device_model": f"{order.device_brand} {order.device_model}" if order.device_brand else order.device_model,
+                    "total_cost": order.total_cost,
+                    "status": order.status,
+                    "created_at": order.created_at.isoformat() if order.created_at else None,
+                }
+        
+        # Обновляем комментарий с номером заказа если это начисление
+        comment = rec.comment or ''
+        if rec.order_id and not comment:
+            comment = f'Начисление за заказ #{rec.order_id}'
+
+        result.append({
+            "id": rec.id,
+            "username": username,
+            "order": order_info,
+            "calculated_amount": rec.calculated_amount,
+            "status": rec.status,  # accrued / deducted / paid
+            "period_start": rec.period_start.isoformat() if rec.period_start else None,
+            "period_end": rec.period_end.isoformat() if rec.period_end else None,
+            "created_at": rec.created_at.isoformat() if rec.created_at else None,
+            "comment": comment,
+        })
+
+    # Считаем итоги
+    total_accrued = sum(r.calculated_amount for r in records if r.status == 'accrued')
+    total_deducted = sum(r.calculated_amount for r in records if r.status == 'deducted')
+    total_paid = sum(r.calculated_amount for r in records if r.status == 'paid')
+
+    return {
+        "user_id": user_id,
+        "username": username,
+        "records": result,
+        "summary": {
+            "total_accrued": round(total_accrued, 2),
+            "total_deducted": round(total_deducted, 2),
+            "total_paid": round(total_paid, 2),
+            "balance": round(total_accrued + total_deducted + total_paid, 2),  # К выплате (paid уже отриц.)
+        }
+    }
+
+
+@router.post("/records/{user_id}/pay", summary="Выплатить зарплату сотруднику")
+def pay_salary(
+    user_id: int,
+    amount: float,
+    comment: Optional[str] = None,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Выплата зарплаты сотруднику.
+    Создаёт запись SalaryRecord со статусом 'paid' и транзакцию в кассе (расход).
+    """
+    # Проверяем сотрудника
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+    
+    # Проверяем баланс (начисления - удержания - выплаты)
+    accrued = session.exec(
+        select(func.sum(SalaryRecord.calculated_amount)).where(
+            SalaryRecord.user_id == user_id,
+            SalaryRecord.status == 'accrued'
+        )
+    ).first() or 0
+    
+    deducted = session.exec(
+        select(func.sum(SalaryRecord.calculated_amount)).where(
+            SalaryRecord.user_id == user_id,
+            SalaryRecord.status == 'deducted'
+        )
+    ).first() or 0
+    
+    paid = session.exec(
+        select(func.sum(SalaryRecord.calculated_amount)).where(
+            SalaryRecord.user_id == user_id,
+            SalaryRecord.status == 'paid'
+        )
+    ).first() or 0
+    
+    balance = accrued + deducted - paid  # deducted отрицательный
+    
+    if amount > balance:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Недостаточно средств для выплаты. Баланс: {balance:.2f}₽, Запрошено: {amount:.2f}₽"
+        )
+    
+    # Создаём запись о выплате
+    record = SalaryRecord(
+        user_id=user_id,
+        order_id=None,
+        calculated_amount=amount,
+        status='paid',
+        period_start=datetime.utcnow(),
+        period_end=datetime.utcnow(),
+        comment=comment or f"Выплата зарплаты {user.full_name or user.username}",
+    )
+    session.add(record)
+    
+    # Создаём транзакцию в кассе (расход)
+    # Берём активную смену
+    active_shift = session.exec(
+        select(CashShift).where(CashShift.is_open == True).order_by(CashShift.opened_at.desc())
+    ).first()
+    
+    if not active_shift:
+        raise HTTPException(
+            status_code=400,
+            detail="Нет активной кассовой смены. Откройте смену перед выплатой."
+        )
+    
+    cash_transaction = CashTransaction(
+        shift_id=active_shift.id,
+        transaction_type=TransactionType.expense,
+        amount=-amount,  # Расход отрицательный
+        comment=comment or f"Выплата зарплаты {user.full_name or user.username}",
+        created_by=current_user.id,
+    )
+    session.add(cash_transaction)
+    
+    session.commit()
+    
+    logger.info(f"Выплачена зарплата {amount}₽ сотруднику {user.username} (баланс был: {balance:.2f}₽)")
+    
+    return {
+        "message": f"Выплачено {amount}₽",
+        "user_id": user_id,
+        "username": user.username,
+        "balance_before": round(balance, 2),
+        "balance_after": round(balance - amount, 2),
+        "record_id": record.id,
+        "cash_transaction_id": cash_transaction.id,
+    }
+
+
+@router.get("/records/report", summary="Отчёт по зарплате мастеров")
+def salary_report(
+    user_id: Optional[int] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    status: Optional[str] = Query(None),
+    skip: int = Query(0),
+    limit: int = Query(100),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Отчёт по начислениям зарплаты мастерам.
+    Возвращает список записей с информацией о заказах и суммах.
+    """
+    query = select(SalaryRecord).order_by(SalaryRecord.created_at.desc())
+    
+    if user_id:
+        query = query.where(SalaryRecord.user_id == user_id)
+    if date_from:
+        query = query.where(SalaryRecord.created_at >= date_from)
+    if date_to:
+        query = query.where(SalaryRecord.created_at <= date_to)
+    if status:
+        query = query.where(SalaryRecord.status == status)
+
+    # Считаем общее количество
+    count_query = select(func.count(SalaryRecord.id))
+    if user_id:
+        count_query = count_query.where(SalaryRecord.user_id == user_id)
+    if date_from:
+        count_query = count_query.where(SalaryRecord.created_at >= date_from)
+    if date_to:
+        count_query = count_query.where(SalaryRecord.created_at <= date_to)
+    if status:
+        count_query = count_query.where(SalaryRecord.status == status)
+    
+    total = session.exec(count_query).first() or 0
+    records = session.exec(query.offset(skip).limit(limit)).all()
+    
+    result = []
+    for rec in records:
+        order_info = None
+        if rec.order_id:
+            order = session.get(Order, rec.order_id)
+            if order:
+                order_info = {
+                    "id": order.id,
+                    "client_name": order.client_name,
+                    "device_model": f"{order.device_brand} {order.device_model}" if order.device_brand else order.device_model,
+                    "total_cost": order.total_cost,
+                    "status": order.status,
+                }
+        
+        user = session.get(User, rec.user_id)
+        
+        result.append({
+            "id": rec.id,
+            "user_id": rec.user_id,
+            "user_name": user.username if user else "—",
+            "order": order_info,
+            "calculated_amount": rec.calculated_amount,
+            "status": rec.status,
+            "comment": rec.comment,
+            "created_at": rec.created_at.isoformat() if rec.created_at else None,
+            "period_start": rec.period_start.isoformat() if rec.period_start else None,
+            "period_end": rec.period_end.isoformat() if rec.period_end else None,
+        })
+
+    return {
+        "records": result,
+        "total": total,
+        "total_amount": sum(r['calculated_amount'] for r in result),
+    }

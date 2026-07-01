@@ -1,0 +1,20 @@
+# Backend dependencies
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlmodel==0.0.22
+alembic==1.14.0
+psycopg2-binary==2.9.10
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.20
+aiogram==3.17.0
+apscheduler==3.11.0
+reportlab==4.2.5
+openpyxl==3.1.5
+simpleeval==1.0.3
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+httpx
+qrcode[pil]
+aiohttp-socks==0.10.1

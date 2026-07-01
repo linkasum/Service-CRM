@@ -1,0 +1,593 @@
+import React, { useState, useEffect } from 'react'
+import {
+  Form, Input, Button, Table, Modal, Space, Popconfirm, message,
+  Card, Tag, Checkbox, Row, Col, Select, Alert, Divider, Radio, InputNumber, Menu, Typography
+} from 'antd'
+import {
+  PlusOutlined, EditOutlined, DeleteOutlined, SaveOutlined,
+  ToolOutlined, TeamOutlined, EyeOutlined, CodeOutlined,
+  CheckCircleOutlined, CalculatorOutlined, ThunderboltOutlined,
+  SettingOutlined, UserOutlined, LockOutlined, BankOutlined,
+  ShopOutlined, TagsOutlined, ClusterOutlined, GlobalOutlined,
+  IdcardOutlined, MobileOutlined, DollarOutlined, FileTextOutlined,
+  EyeOutlined as EyeIcon,
+} from '@ant-design/icons'
+import {
+  getRoles, createRole, updateRole, deleteRole,
+  getCompanySettings, updateCompanySettings,
+  getTemplates, updateTemplate,
+} from '../api'
+import api from '../api'
+import {
+  getUsers, createUser, updateUser, deactivateUser, resetUserPassword,
+} from '../api'
+import PermissionsTab from './PermissionsTab'
+import BotSettingsPage from './BotSettingsPage'
+import TemplateEditor from '../components/TemplateEditor'
+import EmployeesTab from './EmployeesTab'
+import SalaryConfigTab from './SalaryConfigTab'
+import { StatusesTab, BrandsTab, CategoriesTab, ClientSourcesTab, AgeGroupsTab, DeviceModelsTab, CompanyExtendedTab, CashTab } from './SettingsExtraTab'
+import dayjs from 'dayjs'
+import { Editor } from '@tinymce/tinymce-react'
+
+const { TextArea } = Input
+const { Title, Text } = Typography
+
+// Доступные права для чекбоксов
+const ALL_PERMISSIONS = [
+  { key: 'order.create', label: 'Создание заказов' },
+  { key: 'order.view', label: 'Просмотр заказов' },
+  { key: 'order.edit', label: 'Редактирование заказов' },
+  { key: 'order.delete', label: 'Удаление заказов' },
+  { key: 'client.view', label: 'Просмотр клиентов' },
+  { key: 'client.edit', label: 'Редактирование клиентов' },
+  { key: 'part.create', label: 'Добавление запчастей' },
+  { key: 'part.view', label: 'Просмотр склада' },
+  { key: 'part.edit', label: 'Редактирование склада' },
+  { key: 'part.delete', label: 'Удаление запчастей' },
+  { key: 'salary.view', label: 'Просмотр зарплат' },
+  { key: 'salary.edit', label: 'Управление зарплатами' },
+  { key: 'salary.manage', label: 'Ведомости' },
+  { key: 'report.view', label: 'Отчёты' },
+  { key: 'role.manage', label: 'Управление ролями' },
+  { key: 'user.manage', label: 'Управление пользователями' },
+  { key: 'settings.manage', label: 'Настройки компании' },
+]
+
+
+const SettingsPage: React.FC = () => {
+  const [activeKey, setActiveKey] = useState('employees')
+  
+  const menuItems = [
+    { key: 'employees', icon: <TeamOutlined />, label: 'Сотрудники' },
+    { key: 'statuses', icon: <TagsOutlined />, label: 'Статусы' },
+    { key: 'brands', icon: <MobileOutlined />, label: 'Бренды' },
+    { key: 'categories', icon: <ClusterOutlined />, label: 'Категории' },
+    { key: 'sources', icon: <GlobalOutlined />, label: 'Источники' },
+    { key: 'age-groups', icon: <IdcardOutlined />, label: 'Возрасты' },
+    { key: 'models', icon: <MobileOutlined />, label: 'Модели' },
+    { key: 'cash', icon: <DollarOutlined />, label: 'Касса' },
+    { key: 'company-ext', icon: <BankOutlined />, label: 'Реквизиты' },
+    { key: 'roles', icon: <LockOutlined />, label: 'Роли' },
+    { key: 'permissions', icon: <EyeOutlined />, label: 'Разрешения' },
+    { key: 'bot', icon: <ToolOutlined />, label: 'Бот' },
+    { key: 'salary', icon: <CalculatorOutlined />, label: 'Зарплаты' },
+    { key: 'company', icon: <ShopOutlined />, label: 'Компания' },
+    { key: 'templates', icon: <FileTextOutlined />, label: 'Шаблоны' },
+  ]
+
+  const tabContent: Record<string, React.ReactNode> = {
+    'employees': <EmployeesTab />,
+    'statuses': <StatusesTab />,
+    'brands': <BrandsTab />,
+    'categories': <CategoriesTab />,
+    'sources': <ClientSourcesTab />,
+    'age-groups': <AgeGroupsTab />,
+    'models': <DeviceModelsTab />,
+    'cash': <CashTab />,
+    'company-ext': <CompanyExtendedTab />,
+    'roles': <RolesTab />,
+    'permissions': <PermissionsTab />,
+    'bot': <BotSettingsPage />,
+    'salary': <SalaryConfigTab />,
+    'company': <CompanyTab />,
+    'templates': <TemplatesTab />,
+  }
+
+  return (
+    <div>
+      <Title level={3} style={{ marginBottom: 16 }}>⚙️ Настройки</Title>
+      <Row gutter={16}>
+        <Col xs={24} md={6}>
+          <Card size="small" style={{ position: 'sticky', top: 16 }}>
+            <Menu
+              mode="inline"
+              selectedKeys={[activeKey]}
+              onClick={({ key }) => setActiveKey(key)}
+              items={menuItems}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} md={18}>
+          <Card size="small">
+            {tabContent[activeKey] || <Text>Раздел не найден</Text>}
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  )
+}
+
+// === РОЛИ ===
+
+const RolesTab: React.FC = () => {
+  const [roles, setRoles] = useState<any[]>([])
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingRole, setEditingRole] = useState<any>(null)
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
+
+  useEffect(() => { fetchRoles() }, [])
+
+  const fetchRoles = async () => {
+    try {
+      const data = await getRoles()
+      setRoles(data)
+    } catch (error) {
+      message.error('Ошибка загрузки ролей')
+    }
+  }
+
+  const handleOpenModal = (role?: any) => {
+    if (role) {
+      setEditingRole(role)
+      setSelectedPermissions(role.permissions || [])
+    } else {
+      setEditingRole(null)
+      setSelectedPermissions([])
+    }
+    setModalOpen(true)
+  }
+
+  const handleSubmit = async () => {
+    try {
+      if (editingRole) {
+        await updateRole(editingRole.id, { permissions: selectedPermissions })
+        message.success('Роль обновлена')
+      } else {
+        message.info('Создание роли через API')
+      }
+      setModalOpen(false)
+      fetchRoles()
+    } catch (error: any) {
+      message.error(error.response?.data?.detail || 'Ошибка сохранения')
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteRole(id)
+      message.success('Роль удалена')
+      fetchRoles()
+    } catch (error: any) {
+      message.error(error.response?.data?.detail || 'Ошибка')
+    }
+  }
+
+  const columns = [
+    { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
+    { title: 'Название', dataIndex: 'name', key: 'name' },
+    { title: 'Описание', dataIndex: 'description', key: 'description' },
+    { title: 'Права', key: 'permissions', render: (_: any, r: any) => (
+      <Space wrap>
+        {(r.permissions || []).map((p: string) => <Tag key={p}>{p}</Tag>)}
+      </Space>
+    )},
+    { title: 'Действия', key: 'actions', width: 120, render: (_: any, r: any) => (
+      <Space>
+        <Button size="small" icon={<EditOutlined />} onClick={() => handleOpenModal(r)} />
+        <Popconfirm title="Удалить?" onConfirm={() => handleDelete(r.id)}>
+          <Button size="small" icon={<DeleteOutlined />} danger />
+        </Popconfirm>
+      </Space>
+    )},
+  ]
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
+        <Title level={4} style={{ margin: 0 }}>🔑 Роли</Title>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>Добавить роль</Button>
+      </div>
+      <Table dataSource={roles} rowKey="id" columns={columns} pagination={false} size="small" />
+
+      <Modal title={editingRole ? 'Редактировать роль' : 'Новая роль'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)}>
+        <Form layout="vertical">
+          <Form.Item label="Права доступа">
+            <Checkbox.Group
+              value={selectedPermissions}
+              onChange={setSelectedPermissions}
+              style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+            >
+              {ALL_PERMISSIONS.map(p => (
+                <Checkbox key={p.key} value={p.key}>{p.label}</Checkbox>
+              ))}
+            </Checkbox.Group>
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  )
+}
+
+// === КОМПАНИЯ ===
+
+const CompanyTab: React.FC = () => {
+  const [form] = Form.useForm()
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => { loadSettings() }, [])
+
+  const loadSettings = async () => {
+    setLoading(true)
+    try {
+      const data = await getCompanySettings()
+      form.setFieldsValue(data)
+    } catch {
+      message.error('Ошибка загрузки настроек')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields()
+      await updateCompanySettings(values)
+      message.success('Настройки сохранены')
+    } catch (error: any) {
+      message.error(error.response?.data?.detail || 'Ошибка сохранения')
+    }
+  }
+
+  return (
+    <div>
+      <Title level={4} style={{ marginBottom: 16 }}>🏢 Настройки компании</Title>
+      <Form form={form} layout="vertical" onFinish={handleSubmit}>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item label="Название компании" name="company_name" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="ИНН" name="inn">
+              <Input />
+            </Form.Item>
+          </Col>
+        </Row>
+        <Form.Item label="Адрес" name="address">
+          <TextArea rows={2} />
+        </Form.Item>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item label="Телефон" name="phone">
+              <Input />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="Email" name="email">
+              <Input />
+            </Form.Item>
+          </Col>
+        </Row>
+        <Form.Item>
+          <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>Сохранить</Button>
+        </Form.Item>
+      </Form>
+    </div>
+  )
+}
+
+// === ШАБЛОНЫ ===
+
+const TemplatesTab: React.FC = () => {
+  const [templates, setTemplates] = useState<any[]>([])
+  const [editingType, setEditingType] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewContent, setPreviewContent] = useState('')
+  const [previewTitle, setPreviewTitle] = useState('')
+  const [addModal, setAddModal] = useState(false)
+  const [newType, setNewType] = useState('')
+  const [newContent, setNewContent] = useState('')
+
+  useEffect(() => { fetchTemplates() }, [])
+
+  const fetchTemplates = async () => {
+    try {
+      const data = await getTemplates()
+      setTemplates(data)
+    } catch (error) {
+      message.error('Ошибка загрузки шаблонов')
+    }
+  }
+
+  const handleEdit = (tmpl: any) => {
+    setEditingType(tmpl.type)
+    setEditContent(tmpl.content_template)
+  }
+
+  const handleSave = async (type: string) => {
+    setSaving(true)
+    try {
+      const tmpl = templates.find(t => t.type === type)
+      await updateTemplate(tmpl.id, { content_template: editContent })
+      message.success('Шаблон сохранён')
+      setEditingType(null)
+      fetchTemplates()
+    } catch (error: any) {
+      message.error(error.response?.data?.detail || 'Ошибка сохранения')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePreview = (tmpl: any) => {
+    const info = templateInfo[tmpl.type] || { name: tmpl.type }
+    setPreviewTitle(`${info.name} — ${tmpl.type}`)
+    setPreviewContent(tmpl.content_template)
+    setPreviewOpen(true)
+  }
+
+  const handleAddTemplate = async () => {
+    if (!newType.trim()) { message.error('Введите тип шаблона'); return }
+    try {
+      const { createTemplate } = await import('../api')
+      await createTemplate({ type: newType.trim(), content_template: newContent })
+      message.success('Шаблон создан')
+      setAddModal(false)
+      setNewType('')
+      setNewContent('')
+      fetchTemplates()
+    } catch (error: any) {
+      message.error(error.response?.data?.detail || 'Ошибка создания')
+    }
+  }
+
+  const templateInfo: Record<string, { name: string; icon: string; color: string; desc: string }> = {
+    receipt: { name: 'Квитанция приёма', icon: '🧾', color: 'blue', desc: 'Выдаётся клиенту при приёме устройства' },
+    diagnostic_act: { name: 'Акт диагностики', icon: '🔍', color: 'orange', desc: 'Результаты диагностики устройства' },
+    work_act: { name: 'Акт выполненных работ', icon: '✅', color: 'green', desc: 'Подтверждение выполненных работ' },
+    invoice: { name: 'Счёт для юрлица', icon: '📄', color: 'purple', desc: 'Счёт для юридических лиц' },
+  }
+
+  const existingTypes = templates.map(t => t.type)
+  const availableTypes = Object.keys(templateInfo).filter(t => !existingTypes.includes(t))
+
+  const columns = [
+    {
+      title: '№',
+      key: 'index',
+      width: 50,
+      render: (_: any, __: any, idx: number) => idx + 1,
+    },
+    {
+      title: 'Название',
+      key: 'name',
+      width: 200,
+      render: (_: any, r: any) => {
+        const info = templateInfo[r.type] || { name: r.type, icon: '📄', color: 'default', desc: '' }
+        return (
+          <div>
+            <Tag color={info.color}>{info.icon} {info.name}</Tag>
+            <br />
+            <Text type="secondary" style={{ fontSize: 11 }}>{info.desc}</Text>
+          </div>
+        )
+      },
+    },
+    {
+      title: 'Тип',
+      dataIndex: 'type',
+      key: 'type',
+      width: 130,
+      render: (v: string) => <Tag code>{v}</Tag>,
+    },
+    {
+      title: 'Содержимое шаблона',
+      key: 'content',
+      render: (_: any, r: any) => {
+        const isEditing = editingType === r.type
+        if (isEditing) {
+          return (
+            <Editor
+              tinymceScriptSrc="https://cdn.tiny.cloud/1/ldkgvuzw7s1ftleqvo8xvvels9qx3mexqe9b1ps8n950qcg/tinymce/6/tinymce.min.js"
+              apiKey="ldkgvuzw7s1ftleqvo8xvvels9qx3mexqe9b1ps8n950qcg"
+              value={editContent}
+              onEditorChange={setEditContent}
+              init={{
+                height: 300,
+                menubar: false,
+                plugins: 'lists link code table help wordcount',
+                toolbar: 'undo redo | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist | link code | removeformat',
+                branding: true,
+                promotion: false,
+                statusbar: true,
+              }}
+            />
+          )
+        }
+        return (
+          <div
+            dangerouslySetInnerHTML={{ __html: r.content_template }}
+            style={{
+              fontSize: 11, lineHeight: 1.4,
+              background: '#fafafa', padding: 8, borderRadius: 4,
+              maxHeight: 100, overflow: 'auto',
+              border: '1px solid #f0f0f0',
+            }}
+          />
+        )
+      },
+    },
+    {
+      title: 'Обновлён',
+      dataIndex: 'updated_at',
+      key: 'updated_at',
+      width: 140,
+      render: (v: string) => v ? dayjs(v).format('DD.MM.YYYY HH:mm') : '—',
+    },
+    {
+      title: 'Действия',
+      key: 'actions',
+      width: 180,
+      render: (_: any, r: any) => {
+        const isEditing = editingType === r.type
+        if (isEditing) {
+          return (
+            <Space direction="vertical" size={4}>
+              <Button
+                size="small"
+                type="primary"
+                icon={<SaveOutlined />}
+                onClick={() => handleSave(r.type)}
+                loading={saving}
+                block
+              >
+                Сохранить
+              </Button>
+              <Button size="small" onClick={() => { setEditingType(null) }} block>
+                Отмена
+              </Button>
+            </Space>
+          )
+        }
+        return (
+          <Space direction="vertical" size={4}>
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => handlePreview(r)}
+              block
+            >
+              Просмотр
+            </Button>
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(r)}
+              block
+            >
+              Редактировать
+            </Button>
+          </Space>
+        )
+      },
+    },
+  ]
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Title level={4} style={{ margin: 0 }}>📄 Шаблоны документов</Title>
+        <Space>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setAddModal(true)}
+            disabled={availableTypes.length === 0}
+          >
+            Добавить шаблон
+          </Button>
+        </Space>
+      </div>
+      <Alert
+        message="Подсказка"
+        description="Переменные: {client_name}, {client_phone}, {device_brand}, {device_model}, {complaint}, {total_cost}, {parts_cost}, {work_cost}, {order_id}, {company_name}, {company_inn}, {company_address}, {company_phone}"
+        type="info"
+        showIcon
+        style={{ marginBottom: 16, fontSize: 12 }}
+      />
+      <Table
+        dataSource={templates}
+        rowKey="id"
+        columns={columns}
+        pagination={false}
+        size="middle"
+        scroll={{ x: 1000 }}
+      />
+
+      {/* Модалка предпросмотра */}
+      <Modal
+        title={`👁️ Предпросмотр: ${previewTitle}`}
+        open={previewOpen}
+        onCancel={() => setPreviewOpen(false)}
+        width={800}
+        footer={[
+          <Button key="close" onClick={() => setPreviewOpen(false)}>Закрыть</Button>,
+        ]}
+      >
+        <div
+          dangerouslySetInnerHTML={{ __html: previewContent }}
+          style={{
+            padding: 20,
+            background: '#fff',
+            border: '1px solid #e8e8e8',
+            borderRadius: 4,
+            minHeight: 400,
+          }}
+        />
+      </Modal>
+
+      {/* Модалка добавления шаблона */}
+      <Modal
+        title="➕ Добавить шаблон"
+        open={addModal}
+        onOk={handleAddTemplate}
+        onCancel={() => { setAddModal(false); setNewType(''); setNewContent('') }}
+        width={800}
+        okText="Создать"
+        cancelText="Отмена"
+      >
+        <Form layout="vertical">
+          <Form.Item label="Тип шаблона" required>
+            <Select
+              value={newType}
+              onChange={setNewType}
+              placeholder="Выберите тип документа"
+            >
+              {availableTypes.map(t => {
+                const info = templateInfo[t]
+                return (
+                  <Select.Option key={t} value={t}>
+                    {info.icon} {info.name} ({t})
+                  </Select.Option>
+                )
+              })}
+            </Select>
+          </Form.Item>
+          <Form.Item label="Содержимое шаблона">
+            <Editor
+              tinymceScriptSrc="https://cdn.tiny.cloud/1/ldkgvuzw7s1ftleqvo8xvvels9qx3mexqe9b1ps8n950qcg/tinymce/6/tinymce.min.js"
+              apiKey="ldkgvuzw7s1ftleqvo8xvvels9qx3mexqe9b1ps8n950qcg"
+              value={newContent}
+              onEditorChange={setNewContent}
+              init={{
+                height: 300,
+                menubar: false,
+                plugins: 'lists link code table help wordcount',
+                toolbar: 'undo redo | bold italic underline strikethrough | alignleft aligncenter alignright | bullist numlist | link code | removeformat',
+                branding: true,
+                promotion: false,
+                statusbar: true,
+              }}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  )
+}
+
+export default SettingsPage
