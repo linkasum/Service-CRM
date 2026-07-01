@@ -53,3 +53,6 @@ documents/
 *qwencrm_full*
 *backup*
 *.dump
+._*
+*.bak
+.DS_Store
