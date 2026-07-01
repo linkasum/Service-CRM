@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { 
-  Card, Descriptions, Tag, Button, Space, Modal, Form, Input, 
+  Card, Descriptions, Tag, Button, Space, Modal, Form, Input, AutoComplete, 
   message, Badge, Timeline, Spin, Select, List, Avatar, Typography, Row, Col, Tabs, Divider,
   Popconfirm, Table, Progress, Statistic, Checkbox
 } from 'antd'
@@ -1140,26 +1140,17 @@ const OrderDetailPage: React.FC = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item label="Внешний вид" name="appearance">
-                <Select allowClear placeholder="—">
-                  <Select.Option value="Б/У">Б/У</Select.Option>
-                  <Select.Option value="Новый">Новый</Select.Option>
-                  <Select.Option value="Как новый">Как новый</Select.Option>
-                  <Select.Option value="С царапинами">С царапинами</Select.Option>
-                  <Select.Option value="С повреждениями">С повреждениями</Select.Option>
-                </Select>
+                <AutoComplete placeholder="б/у, новый, с царапинами" options={[
+                  {value:'Б/У'},{value:'Новый'},{value:'Как новый'},{value:'С царапинами'},{value:'С повреждениями'}
+                ]} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item label="Вид устройства" name="device_category">
-                <Select>
-                  <Select.Option value="phone">📱 Телефон</Select.Option>
-                  <Select.Option value="laptop">💻 Ноутбук</Select.Option>
-                  <Select.Option value="tablet">📋 Планшет</Select.Option>
-                  <Select.Option value="tv">📺 Телевизор</Select.Option>
-                  <Select.Option value="pc">🖥️ Компьютер</Select.Option>
-                  <Select.Option value="appliance">🏠 Бытовая техника</Select.Option>
-                  <Select.Option value="other">Другое</Select.Option>
-                </Select>
+                <AutoComplete placeholder="Пылесос, Телефон, Ноутбук..." options={[
+                  {value:'Телефон'},{value:'Ноутбук'},{value:'Планшет'},{value:'Телевизор'},{value:'Пылесос'},
+                  {value:'Кофемашина'},{value:'Микроволновка'},{value:'Фен'},{value:'Утюг'},{value:'Другое'}
+                ]} />
               </Form.Item>
             </Col>
             <Col span={12}>
