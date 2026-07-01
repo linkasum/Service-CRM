@@ -1685,3 +1685,46 @@ async def menu_callback(callback: CallbackQuery):
     )
     await callback.answer()
 
+
+async def notify_overdue_orders(bot: Bot):
+    """Найти просроченные заказы и отправить уведомления мастерам"""
+    with Session(engine) as session:
+        overdue_statuses = ["diagnostics", "agreed", "repair", "waiting_parts"]
+        cutoff = datetime.utcnow() - timedelta(days=3)
+        
+        overdue = session.exec(
+            select(Order).where(
+                Order.status.in_(overdue_statuses),
+                Order.created_at < cutoff,
+                Order.master_id.isnot(None),
+            )
+        ).all()
+        
+        if not overdue:
+            logger.info("Просроченных заказов не найдено")
+            return
+        
+        by_master = {}
+        for o in overdue:
+            if o.master_id not in by_master:
+                by_master[o.master_id] = []
+            by_master[o.master_id].append(o)
+        
+        for master_id, orders in by_master.items():
+            master = session.get(User, master_id)
+            if not master or not master.telegram_chat_id:
+                continue
+            
+            lines = [f"Просроченные заказы ({len(orders)} шт.):\n"]
+            for o in sorted(orders, key=lambda x: x.created_at)[:10]:
+                days = (datetime.utcnow().date() - o.created_at.date()).days
+                lines.append(
+                    f"#{o.id} {o.status} - {days} дн.\n"
+                    f"  {o.client_name}, {o.device_brand or ''} {o.device_model or ''}"
+                )
+            
+            try:
+                await bot.send_message(master.telegram_chat_id, "\n".join(lines))
+                logger.info(f"Overdue sent to {master.username}: {len(orders)} orders")
+            except Exception as exc:
+                logger.warning(f"Failed to send overdue to {master.username}: {exc}")

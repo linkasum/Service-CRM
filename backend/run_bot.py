@@ -11,6 +11,7 @@
 import asyncio
 import sys
 import os
+from datetime import datetime, timedelta
 
 # Добавляем backend в path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -33,9 +34,28 @@ async def main():
     logger.info("=" * 50)
 
     # Импортируем бота (не запуская FastAPI)
-    from bot.bot import dp, bot, stop_bot
+    from bot.bot import dp, bot, stop_bot, notify_overdue_orders
+
+    async def daily_overdue_task():
+        """Каждый день в 10:00 МСК (07:00 UTC) отправлять уведомления о просроченных заказах"""
+        while True:
+            now = datetime.utcnow()
+            target = now.replace(hour=7, minute=0, second=0, microsecond=0)
+            if now > target:
+                target += timedelta(days=1)
+            wait = (target - now).total_seconds()
+            logger.info(f"Следующая проверка просрочек через {wait/3600:.1f} часов (в {target.strftime('%H:%M')} UTC)")
+            await asyncio.sleep(wait)
+            try:
+                logger.info("Запуск ежедневной проверки просроченных заказов...")
+                await notify_overdue_orders(bot)
+            except Exception as exc:
+                logger.error(f"Ошибка проверки просрочек: {exc}", exc_info=True)
+            await asyncio.sleep(60)  # чтобы не сработало дважды
+
 
     try:
+        asyncio.create_task(daily_overdue_task())
         await dp.start_polling(bot, polling_timeout=20)
     except KeyboardInterrupt:
         logger.info("Остановка бота по Ctrl+C...")
