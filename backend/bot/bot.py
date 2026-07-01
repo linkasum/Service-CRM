@@ -1223,10 +1223,17 @@ async def dashboard_cmd(message: types.Message):
         return
     with Session(engine) as session:
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        today_count = session.exec(select(func.count(Order.id)).where(Order.created_at >= today)).one()
-        active_count = session.exec(select(func.count(Order.id)).where(Order.status.not_in(["issued", "issued_br", "cancelled"]))).one()
-        repair_count = session.exec(select(func.count(Order.id)).where(Order.status == "repair")).one()
-        ready_count = session.exec(select(func.count(Order.id)).where(Order.status == "ready")).one()
+        def count(extra_where=None):
+            q = select(func.count(Order.id))
+            if user["role"] == "master":
+                q = q.where(Order.master_id == user["id"])
+            if extra_where is not None:
+                q = q.where(extra_where)
+            return session.exec(q).one()
+        today_count = count(Order.created_at >= today)
+        active_count = count(Order.status.not_in(["issued", "issued_br", "cancelled", "ready_pickup"]))
+        repair_count = count(Order.status == "repair")
+        ready_count = count(Order.status == "ready")
     await message.answer(
         "Дашборд:\n"
         f"Заказов сегодня: {today_count}\n"
