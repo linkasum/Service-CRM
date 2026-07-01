@@ -281,6 +281,8 @@ def get_orders(
                 (Order.client_phone.ilike(f"%{search}%")) |
                 (Order.device_model.ilike(f"%{search}%")) |
                 (Order.device_brand.ilike(f"%{search}%"))
+        if current_user.role and current_user.role.name == 'master':
+            query = query.where(Order.master_id == current_user.id)
             )
 
         count_query = select(func.count(Order.id)).select_from(query.subquery())
