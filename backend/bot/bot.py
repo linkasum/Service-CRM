@@ -57,7 +57,7 @@ bot_session = AiohttpSession(proxy=telegram_proxy_url, timeout=120) if telegram_
 bot = Bot(token=settings.TELEGRAM_BOT_TOKEN, session=bot_session)
 dp = Dispatcher()
 
-CRM_URL = os.getenv("CRM_FRONTEND_URL", "http://localhost:5173").rstrip("/")
+CRM_URL = os.getenv("CRM_FRONTEND_URL", "http://10.20.4.199:5173").rstrip("/")
 
 ROLE_MAP = {1: "admin", 2: "manager", 3: "master", 4: "acceptor", 5: "courier"}
 ROLE_LABELS = {
@@ -304,7 +304,7 @@ def can_access_order(user: dict, order: Order) -> bool:
 
 
 def orders_query_for_user(user: dict):
-    query = select(Order).where(Order.status.in_(ACTIVE_STATUSES))
+    query = select(Order).where(Order.status.not_in(["issued", "issued_br", "cancelled"]), Order.total_cost > 0)
     if user["role"] == "master":
         query = query.where(Order.master_id == user["id"])
     return query.order_by(Order.created_at.desc())
@@ -559,9 +559,9 @@ async def orders_callback(callback: CallbackQuery):
     with Session(engine) as session:
         orders = session.exec(orders_query_for_user(user)).all()[:15]
     if not orders:
-        await callback.message.answer("Активных заказов нет")
+        await callback.message.edit_text("Активных заказов нет")
     else:
-        await callback.message.answer("Активные заказы:", reply_markup=orders_list_keyboard(orders))
+        await callback.message.edit_text("Активные заказы:", reply_markup=orders_list_keyboard(orders))
     await callback.answer()
 
 
@@ -1215,7 +1215,7 @@ async def dashboard_cmd(message: types.Message):
     with Session(engine) as session:
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         today_count = session.exec(select(func.count(Order.id)).where(Order.created_at >= today)).one()
-        active_count = session.exec(select(func.count(Order.id)).where(Order.status.in_(ACTIVE_STATUSES))).one()
+        active_count = session.exec(select(func.count(Order.id)).where(Order.status.not_in(["issued", "issued_br", "cancelled"]), Order.total_cost > 0)).one()
         repair_count = session.exec(select(func.count(Order.id)).where(Order.status == "repair")).one()
         ready_count = session.exec(select(func.count(Order.id)).where(Order.status == "ready")).one()
     await message.answer(
@@ -1655,3 +1655,17 @@ async def start_bot():
 async def stop_bot():
     await bot.session.close()
     logger.info("Bot stopped")
+
+@dp.callback_query(lambda callback: callback.data == "menu")
+async def menu_callback(callback: CallbackQuery):
+    user = get_user(callback.from_user.id)
+    if not user or not callback.message:
+        await callback.answer()
+        return
+    role_label = ROLE_LABELS.get(user["role"], user["role"])
+    await callback.message.edit_text(
+        f"{user[full_name]} - {role_label}\nВыберите действие:",
+        reply_markup=main_keyboard(user),
+    )
+    await callback.answer()
+
