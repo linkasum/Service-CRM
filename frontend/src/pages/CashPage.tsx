@@ -101,10 +101,12 @@ const CashPage: React.FC = () => {
 
   const searchOrders = async (q: string) => {
     setOrderSearch(q)
-    if (!q || q.length < 2) { setOrderList([]); return }
     try {
-      const res = await api.get(`/orders?search=${q}&limit=20`)
-      setOrderList(Array.isArray(res.data) ? res.data : res.data?.items || [])
+      const params = new URLSearchParams({ limit: '20' })
+      if (q && q.length >= 2) params.set('search', q)
+      const res = await api.get(`/orders?${params}`)
+      const data = Array.isArray(res.data) ? res.data : (res.data?.items || res.data || [])
+      setOrderList(data)
     } catch { setOrderList([]) }
   }
 
@@ -182,6 +184,7 @@ const CashPage: React.FC = () => {
         amount: values.amount,
         order_id: values.order_id,
         comment: values.comment,
+        is_parts: values.is_parts || false,
       })
       message.success(`${TX_TYPES[txType].label} проведён`)
       setTxModal(false)
@@ -197,6 +200,9 @@ const CashPage: React.FC = () => {
     setTxType(type)
     txForm.resetFields()
     txForm.setFieldsValue({ transaction_type: type })
+    if (type === 'income' || type === 'expense') {
+      searchOrders('')
+    }
     setTxModal(true)
   }
 
@@ -542,6 +548,32 @@ const CashPage: React.FC = () => {
                 }))}
               />
             </Form.Item>
+          )}
+          {txType === 'expense' && (
+            <>
+              <Form.Item name="is_parts" valuePropName="checked">
+                <Checkbox onChange={(e) => { if (!e.target.checked) txForm.setFieldValue('order_id', undefined) }}>
+                  Запчасти для мастера (вычет из ЗП 40%)
+                </Checkbox>
+              </Form.Item>
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.is_parts !== cur.is_parts}>
+                {({ getFieldValue }) => getFieldValue('is_parts') ? (
+                  <Form.Item label="Заказ и мастер" name="order_id">
+                    <Select
+                      showSearch
+                      placeholder="Выберите заказ"
+                      filterOption={false}
+                      onSearch={searchOrders}
+                      allowClear
+                      options={orderList.map((o: any) => ({
+                        value: o.id,
+                        label: `#${o.id} ${o.client_name || ''} — ${o.device_model || ''} (${o.master_username || 'без мастера'})`
+                      }))}
+                    />
+                  </Form.Item>
+                ) : null}
+              </Form.Item>
+            </>
           )}
           <Form.Item label="Комментарий" name="comment">
             <Input placeholder="Описание операции..." />

@@ -374,6 +374,36 @@ def create_transaction(
             )
             session.add(salary_record)
             session.commit()
+
+    # Авто-вычет из ЗП если расход на запчасти для мастера
+    is_parts = data.get("is_parts", False)
+    if tx_type == TransactionType.expense and tx.order_id and is_parts:
+        order = session.get(Order, tx.order_id)
+        if order and order.master_id:
+            deduction = -round(abs(amount) * 0.4)
+            salary_record = SalaryRecord(
+                user_id=order.master_id,
+                order_id=tx.order_id,
+                calculated_amount=deduction,
+                status="deducted",
+                period_start=datetime.utcnow().replace(day=1),
+                period_end=datetime.utcnow(),
+                comment=f"Запчасти: #{tx.order_id}",
+            )
+            session.add(salary_record)
+            # Обновить parts_cost в заказе
+            order.parts_cost = (order.parts_cost or 0) + abs(amount)
+            session.add(order)
+            # Авто-создание запчасти на складе
+            from models.part import Part
+            from models.order_part import OrderPart
+            part_name = data.get("comment", "Запчасть") or "Запчасть"
+            part = Part(name=part_name, quantity=0, purchase_price=abs(amount), sale_price=abs(amount))
+            session.add(part)
+            session.flush()
+            op = OrderPart(order_id=tx.order_id, part_id=part.id, quantity=1, price_at_order=abs(amount), master_id=order.master_id)
+            session.add(op)
+            session.commit()
     
     return {
         "id": tx.id,
