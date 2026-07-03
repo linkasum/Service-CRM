@@ -135,8 +135,10 @@ export const updateOrder = async (id: number, data: Record<string, any>) => {
   return response.data
 }
 
-export const changeOrderStatus = async (id: number, status: string, comment?: string) => {
-  const response = await api.patch(`/orders/${id}/status`, { status, comment })
+export const changeOrderStatus = async (id: number, status: string, comment?: string, payment_method?: string) => {
+  const body: any = { status, comment }
+  if (payment_method) body.payment_method = payment_method
+  const response = await api.patch(`/orders/${id}/status`, body)
   return response.data
 }
 

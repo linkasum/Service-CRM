@@ -16,6 +16,8 @@ from models.order import Order
 from models.order_comment import OrderComment
 from models.order_payment import OrderPayment
 from models.order_payment import PaymentType
+from models.cash_transaction import CashTransaction, TransactionType
+from models.cash_shift import CashShift
 from models.user import User
 from models.role import Role
 from models.notification_task import NotificationTask
@@ -504,16 +506,35 @@ async def change_status(
             ).first()
             if not existing_payment and order.total_cost:
                 from models.order_payment import PaymentMethod as PM, PaymentStatus as PS
+                pm_str = getattr(status_data, 'payment_method', None) or 'cash'
+                pm = PM(pm_str) if pm_str in ('cash', 'card', 'transfer') else PM.cash
                 payment = OrderPayment(
                     order_id=order.id,
                     payment_type=PaymentType.final,
                     amount=order.total_cost,
-                    method=PM.cash,
+                    method=pm,
                     status=PS.completed,
                     comment=f"Авто при выдаче заказа #{order.id}",
                     created_by_id=current_user.id,
                 )
                 session.add(payment)
+                
+                # Создать CashTransaction в активной смене
+                from models.cash_transaction import PaymentMethod as CTPM
+                active_shift = session.exec(
+                    select(CashShift).where(CashShift.is_open == True).limit(1)
+                ).first()
+                if active_shift:
+                    ct = CashTransaction(
+                        shift_id=active_shift.id,
+                        order_id=order.id,
+                        transaction_type=TransactionType.income,
+                        amount=order.total_cost,
+                        payment_method=CTPM(pm_str) if pm_str in ('cash', 'card') else CTPM.cash,
+                        comment=f"Оплата заказа #{order.id}",
+                        created_by=current_user.id,
+                    )
+                    session.add(ct)
 
         session.add(order)
         session.commit()

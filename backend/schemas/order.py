@@ -87,6 +87,7 @@ class OrderUpdate(BaseModel):
 class OrderStatusChange(BaseModel):
     status: str = Field(..., description="Новый статус")
     comment: Optional[str] = None
+    payment_method: Optional[str] = None
 
 
 class OrderRead(OrderBase):
