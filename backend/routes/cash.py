@@ -271,7 +271,7 @@ def get_transactions(
     else:
         # Если смена не указана — берём текущую открытую
         current_shift = session.exec(
-            select(CashShift).where(CashShift.is_open == True).limit(1)
+            select(CashShift).where(CashShift.is_open == True).order_by(CashShift.opened_at.desc()).limit(1)
         ).first()
         if current_shift:
             query = query.where(CashTransaction.shift_id == current_shift.id)
