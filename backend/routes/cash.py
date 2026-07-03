@@ -162,10 +162,11 @@ def close_shift(
     adjustments = sum(t.amount for t in transactions if t.transaction_type == TransactionType.adjustment)
     cash_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.cash)
     card_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.card)
+    cash_expense = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.cash)
 
     # Общий баланс (для статистики) и наличный баланс (для закрытия смены)
     total_balance = shift.initial_amount + income - expense + adjustments
-    cash_balance = shift.initial_amount + cash_income - expense + adjustments
+    cash_balance = shift.initial_amount + cash_income - cash_expense + adjustments
 
     if cash_balance < 0:
         raise HTTPException(

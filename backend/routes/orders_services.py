@@ -48,9 +48,12 @@ def add_service_to_order(
     )
     session.add(order_service)
     
-    # Обновляем work_cost в заказе
-    order.work_cost = (order.work_cost or 0) + (price * (service_data.quantity or 1))
-    order.total_cost = (order.total_cost or 0) + (price * (service_data.quantity or 1))
+    # Пересчитываем work_cost и total_cost из всех услуг и запчастей
+    session.refresh(order)
+    services_total = sum((s.price_at_order or 0) * (s.quantity or 1) for s in order.service_items)
+    parts_total = sum((p.price_at_order or 0) * (p.quantity or 1) for p in (order.parts or []))
+    order.work_cost = services_total
+    order.total_cost = services_total + parts_total
     
     session.commit()
     session.refresh(order_service)
