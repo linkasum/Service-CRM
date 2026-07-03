@@ -104,9 +104,10 @@ const CashPage: React.FC = () => {
     try {
       const params = new URLSearchParams({ limit: '20' })
       if (q && q.length >= 2) params.set('search', q)
-      const res = await api.get(`/orders?${params}`)
-      const data = Array.isArray(res.data) ? res.data : (res.data?.items || res.data || [])
-      setOrderList(data)
+      const res = await api.get(`/orders/?${params}`)
+      const responseData = res.data
+      const items = Array.isArray(responseData) ? responseData : (responseData.items || responseData || [])
+      setOrderList(items)
     } catch { setOrderList([]) }
   }
 

@@ -90,9 +90,10 @@ def get_current_shift(
         "expense": balance["expense"],
         "adjustments": balance["adjustments"],
         "current_balance": balance["current_balance"],
-        "cash_income": balance["cash_income"],
-        "card_income": balance["card_income"],
-        "cash_balance": balance["cash_balance"],
+         "cash_income": balance["cash_income"],
+         "card_income": balance["card_income"],
+         "cash_expense": balance["cash_expense"],
+         "cash_balance": balance["cash_balance"],
         "transactions_count": balance["transactions_count"],
     }
 
@@ -327,8 +328,8 @@ def create_transaction(
         txs = session.exec(
             select(CashTransaction).where(CashTransaction.shift_id == shift.id)
         ).all()
-        current_income = sum(t.amount for t in txs if t.transaction_type == TransactionType.income)
-        current_expense = sum(abs(t.amount) for t in txs if t.transaction_type in (TransactionType.expense, TransactionType.cashout))
+        current_income = sum(t.amount for t in txs if t.transaction_type == TransactionType.income and t.payment_method in (None, PaymentMethod.cash))
+        current_expense = sum(abs(t.amount) for t in txs if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method in (None, PaymentMethod.cash))
         current_balance = shift.initial_amount + current_income - current_expense
         if spend > current_balance:
             raise HTTPException(
@@ -398,7 +399,7 @@ def create_transaction(
             from models.part import Part
             from models.order_part import OrderPart
             part_name = data.get("comment", "Запчасть") or "Запчасть"
-            part = Part(name=part_name, quantity=0, purchase_price=abs(amount), sale_price=abs(amount))
+            part = Part(name=part_name, article=part_name[:50], quantity=0, purchase_price=abs(amount), sale_price=abs(amount))
             session.add(part)
             session.flush()
             op = OrderPart(order_id=tx.order_id, part_id=part.id, quantity=1, price_at_order=abs(amount), master_id=order.master_id)
