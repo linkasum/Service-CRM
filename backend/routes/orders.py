@@ -481,6 +481,46 @@ async def change_status(
             if order.warranty_days:
                 order.warranty_until = datetime.utcnow() + timedelta(days=order.warranty_days)
             
+            # Создаём OrderPayment и CashTransaction ПЕРЕД начислением ЗП
+            existing_payment = session.exec(
+                select(OrderPayment).where(
+                    OrderPayment.order_id == order.id,
+                    OrderPayment.payment_type == PaymentType.final,
+                )
+            ).first()
+            if not existing_payment and order.total_cost:
+                from models.order_payment import PaymentMethod as PM, PaymentStatus as PS
+                from models.cash_transaction import PaymentMethod as CTPM
+                pm_str = getattr(status_data, 'payment_method', None) or 'cash'
+                pm = PM(pm_str) if pm_str in ('cash', 'card', 'transfer') else PM.cash
+                payment = OrderPayment(
+                    order_id=order.id,
+                    payment_type=PaymentType.final,
+                    amount=order.total_cost,
+                    method=pm,
+                    status=PS.completed,
+                    comment=f"Авто при выдаче заказа #{order.id}",
+                    created_by_id=current_user.id,
+                )
+                session.add(payment)
+                
+                # CashTransaction в активной смене
+                active_shift = session.exec(
+                    select(CashShift).where(CashShift.is_open == True).limit(1)
+                ).first()
+                if active_shift:
+                    ct = CashTransaction(
+                        shift_id=active_shift.id,
+                        order_id=order.id,
+                        transaction_type=TransactionType.income,
+                        amount=order.total_cost,
+                        payment_method=CTPM(pm_str) if pm_str in ('cash', 'card') else CTPM.cash,
+                        comment=f"Оплата заказа #{order.id}",
+                        created_by=current_user.id,
+                    )
+                    session.add(ct)
+                session.flush()  # важно: чтобы auto_assign_salary увидел транзакцию
+            
             # Автоначисление зарплаты мастеру
             if order.master_id:
                 from routes.salary_assignment import auto_assign_salary
@@ -496,45 +536,6 @@ async def change_status(
                         logger.info(f"Зарплата за заказ #{order.id}: {salary_result.get('salary_amount', 0)}₽")
                 except Exception as e:
                     logger.error(f"Ошибка начисления зарплаты: {e}")
-
-            # Создаём OrderPayment при выдаче (если ещё нет)
-            existing_payment = session.exec(
-                select(OrderPayment).where(
-                    OrderPayment.order_id == order.id,
-                    OrderPayment.payment_type == PaymentType.final,
-                )
-            ).first()
-            if not existing_payment and order.total_cost:
-                from models.order_payment import PaymentMethod as PM, PaymentStatus as PS
-                pm_str = getattr(status_data, 'payment_method', None) or 'cash'
-                pm = PM(pm_str) if pm_str in ('cash', 'card', 'transfer') else PM.cash
-                payment = OrderPayment(
-                    order_id=order.id,
-                    payment_type=PaymentType.final,
-                    amount=order.total_cost,
-                    method=pm,
-                    status=PS.completed,
-                    comment=f"Авто при выдаче заказа #{order.id}",
-                    created_by_id=current_user.id,
-                )
-                session.add(payment)
-                
-                # Создать CashTransaction в активной смене
-                from models.cash_transaction import PaymentMethod as CTPM
-                active_shift = session.exec(
-                    select(CashShift).where(CashShift.is_open == True).limit(1)
-                ).first()
-                if active_shift:
-                    ct = CashTransaction(
-                        shift_id=active_shift.id,
-                        order_id=order.id,
-                        transaction_type=TransactionType.income,
-                        amount=order.total_cost,
-                        payment_method=CTPM(pm_str) if pm_str in ('cash', 'card') else CTPM.cash,
-                        comment=f"Оплата заказа #{order.id}",
-                        created_by=current_user.id,
-                    )
-                    session.add(ct)
 
         session.add(order)
         session.commit()

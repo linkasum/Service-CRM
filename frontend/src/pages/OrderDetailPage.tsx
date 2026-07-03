@@ -448,6 +448,10 @@ const OrderDetailPage: React.FC = () => {
 
   const handleStatusChange = async (newStatus: string) => {
     if (!order || !id) return
+    if (newStatus === 'issued' && !order.payments?.length && (order.total_cost || 0) > 0) {
+      handlePayment('final')
+      return
+    }
     try {
       await changeOrderStatus(Number(id), newStatus, `Статус изменён через карточку`)
       message.success('Статус обновлён')

@@ -229,6 +229,15 @@ def create_payment(
         username=current_user.username,
     )
     session.add(system_cmt)
+
+    # Обновить баланс активной смены
+    from models.cash_transaction import PaymentMethod as CTPM
+    cash_txs = session.exec(
+        select(CashTransaction).where(CashTransaction.shift_id == active_shift.id)
+    ).all()
+    cash_net = sum(t.amount for t in cash_txs if t.payment_method in (None, CTPM.cash))
+    active_shift.final_amount = active_shift.initial_amount + cash_net
+    session.add(active_shift)
     
     session.commit()
     session.refresh(payment)
