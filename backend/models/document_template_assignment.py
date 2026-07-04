@@ -14,8 +14,8 @@ class DocumentTemplateAssignment(SQLModel, table=True):
     document_type: str = Field(..., max_length=50, description="Тип документа (receipt, diagnostic_act, etc.)")
     template_id: int = Field(..., foreign_key="document_templates.id", description="ID шаблона")
     is_active: bool = Field(default=True, description="Активное назначение")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     
     __table_args__ = (
         UniqueConstraint("document_type", "is_active", name="uq_document_type_active"),

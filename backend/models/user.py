@@ -23,7 +23,7 @@ class User(SQLModel, table=True):
         sa_column=Column(BigInteger, unique=True, index=True),
     )
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
 
     # Связи
     role: Optional["Role"] = Relationship(back_populates="users")

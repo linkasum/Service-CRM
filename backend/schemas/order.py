@@ -27,6 +27,7 @@ class OrderBase(BaseModel):
     device_model: str = Field(..., max_length=300)
     serial_number: Optional[str] = Field(None, max_length=100)
     accessories: Optional[str] = Field(None, max_length=1000)
+    appearance: Optional[str] = Field(None, max_length=100)
     
     # Проблема
     complaint: str = Field(...)

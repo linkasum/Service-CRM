@@ -214,7 +214,7 @@ def update_company_settings(
         setattr(settings, key, value)
     
     from datetime import datetime
-    settings.updated_at = datetime.utcnow()
+    settings.updated_at = datetime.now()
     
     session.add(settings)
     session.commit()
@@ -246,7 +246,7 @@ def create_template(
     template = DocumentTemplate(
         type=template_data.type,
         content_template=template_data.content_template,
-        updated_at=datetime.utcnow()
+        updated_at=datetime.now()
     )
     session.add(template)
     session.commit()
@@ -288,7 +288,7 @@ def update_template(
         template.content_template = template_data.content_template
     
     from datetime import datetime
-    template.updated_at = datetime.utcnow()
+    template.updated_at = datetime.now()
     
     session.add(template)
     session.commit()
@@ -360,8 +360,8 @@ def assign_template(
         document_type=document_type,
         template_id=template_id,
         is_active=True,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(),
+        updated_at=datetime.now()
     )
     
     session.add(assignment)

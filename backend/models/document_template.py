@@ -21,7 +21,7 @@ class DocumentTemplate(SQLModel, table=True):
         sa_column=Column(Text),
         description="HTML или текст для PDF"
     )
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
     def __repr__(self):
         return f"<DocumentTemplate {self.type}>"

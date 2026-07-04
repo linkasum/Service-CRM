@@ -39,7 +39,7 @@ async def main():
     async def daily_overdue_task():
         """Каждый день в 10:00 МСК (07:00 UTC) отправлять уведомления о просроченных заказах"""
         while True:
-            now = datetime.utcnow()
+            now = datetime.now()
             target = now.replace(hour=7, minute=0, second=0, microsecond=0)
             if now > target:
                 target += timedelta(days=1)

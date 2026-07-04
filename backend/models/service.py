@@ -26,7 +26,7 @@ class Service(SQLModel, table=True):
         description="Статус"
     )
     duration_minutes: Optional[int] = Field(default=None, ge=0, description="Время выполнения (мин)")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
 
     def __repr__(self):
         return f"<Service #{self.id} {self.name} {self.price}₽>"

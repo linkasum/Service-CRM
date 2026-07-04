@@ -475,11 +475,11 @@ async def change_status(
             logger.info(f"Создана задача уведомления для заказа #{order.id}")
 
         if status_data.status == "issued":
-            order.issued_at = datetime.utcnow()
+            order.issued_at = datetime.now()
             
             # Гарантия
             if order.warranty_days:
-                order.warranty_until = datetime.utcnow() + timedelta(days=order.warranty_days)
+                order.warranty_until = datetime.now() + timedelta(days=order.warranty_days)
             
             # Создаём OrderPayment и CashTransaction ПЕРЕД начислением ЗП
             existing_payment = session.exec(

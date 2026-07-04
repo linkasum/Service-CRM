@@ -41,7 +41,7 @@ class SalaryConfig(SQLModel, table=True):
     
     description: Optional[str] = Field(default=None, max_length=500)
     is_active: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
 
     def __repr__(self):
         if self.config_type == SalaryType.fixed:

@@ -50,7 +50,7 @@ class OrderPayment(SQLModel, table=True):
         description="Статус"
     )
     comment: Optional[str] = Field(default=None, sa_column=Column(Text))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
     created_by_id: Optional[int] = Field(default=None, foreign_key="users.id")
     
     # Связи

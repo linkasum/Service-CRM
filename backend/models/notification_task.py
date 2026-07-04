@@ -16,7 +16,7 @@ class NotificationTask(SQLModel, table=True):
     message_text: str = Field(max_length=2000)
     send_at: datetime = Field(index=True)
     is_sent: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
 
     order: Optional["Order"] = Relationship(back_populates="notification_tasks")
 

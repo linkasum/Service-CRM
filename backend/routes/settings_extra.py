@@ -619,7 +619,7 @@ def close_cash_shift(
         raise HTTPException(status_code=400, detail="Нет открытой смены")
 
     shift.final_amount = data.get("final_amount", 0)
-    shift.closed_at = datetime.utcnow()
+    shift.closed_at = datetime.now()
     shift.closed_by = current_user.id
     shift.is_open = False
 
@@ -698,7 +698,7 @@ def update_company_extended(
         if key in data:
             setattr(settings, key, data[key])
 
-    settings.updated_at = datetime.utcnow()
+    settings.updated_at = datetime.now()
     session.add(settings)
     session.commit()
     session.refresh(settings)

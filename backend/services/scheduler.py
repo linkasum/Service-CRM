@@ -20,7 +20,7 @@ scheduler = AsyncIOScheduler()
 
 async def check_pending_notifications():
     """Проверить и отправить_pending уведомления"""
-    now = datetime.utcnow()
+    now = datetime.now()
     
     with Session(engine) as session:
         # Найти все неотправленные уведомления, время которых пришло
@@ -76,7 +76,7 @@ async def check_pending_notifications():
 
 async def send_review_reminder():
     """Отправить напоминание об оценке через 24ч после выдачи"""
-    now = datetime.utcnow()
+    now = datetime.now()
     yesterday = now - timedelta(hours=24)
     
     with Session(engine) as session:

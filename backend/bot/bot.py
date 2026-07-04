@@ -1065,9 +1065,9 @@ async def change_status(callback: CallbackQuery):
             return
         order.status = new_status
         if new_status == "ready":
-            order.ready_at = datetime.utcnow()
+            order.ready_at = datetime.now()
         if new_status == "issued":
-            order.issued_at = datetime.utcnow()
+            order.issued_at = datetime.now()
             if order.master_id and order.total_cost:
                 try:
                     from routes.salary_assignment import auto_assign_salary
@@ -1142,7 +1142,7 @@ async def salary_cmd(message: types.Message):
     if not user:
         await message.answer("Вы не авторизованы")
         return
-    now = datetime.utcnow()
+    now = datetime.now()
     period_start = datetime(now.year, now.month, 1) if now.day <= 15 else datetime(now.year, now.month, 16)
     if now.day <= 15:
         period_end = datetime(now.year, now.month, 15, 23, 59, 59)
@@ -1222,7 +1222,7 @@ async def dashboard_cmd(message: types.Message):
         await message.answer("Вы не авторизованы")
         return
     with Session(engine) as session:
-        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         def count(extra_where=None):
             q = select(func.count(Order.id))
             if user["role"] == "master":
@@ -1318,7 +1318,7 @@ async def kassa_close(callback: CallbackQuery):
         shift.final_amount = final
         shift.is_open = False
         shift.closed_by = user["id"]
-        shift.closed_at = datetime.utcnow()
+        shift.closed_at = datetime.now()
         session.add(shift)
         session.commit()
     await callback.message.answer(
@@ -1690,7 +1690,7 @@ async def notify_overdue_orders(bot: Bot):
     """Найти просроченные заказы и отправить уведомления мастерам"""
     with Session(engine) as session:
         overdue_statuses = ["diagnostics", "agreed", "repair", "waiting_parts"]
-        cutoff = datetime.utcnow() - timedelta(days=3)
+        cutoff = datetime.now() - timedelta(days=3)
         
         overdue = session.exec(
             select(Order).where(
@@ -1717,7 +1717,7 @@ async def notify_overdue_orders(bot: Bot):
             
             lines = [f"Просроченные заказы ({len(orders)} шт.):\n"]
             for o in sorted(orders, key=lambda x: x.created_at)[:10]:
-                days = (datetime.utcnow().date() - o.created_at.date()).days
+                days = (datetime.now().date() - o.created_at.date()).days
                 lines.append(
                     f"#{o.id} {o.status} - {days} дн.\n"
                     f"  {o.client_name}, {o.device_brand or ''} {o.device_model or ''}"

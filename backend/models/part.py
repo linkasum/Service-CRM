@@ -15,8 +15,8 @@ class Part(SQLModel, table=True):
     quantity: int = Field(default=0, ge=0)
     cost_price: float = Field(default=0, ge=0)
     sale_price: float = Field(default=0, ge=0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
     order_parts: List["OrderPart"] = Relationship(back_populates="part")
 

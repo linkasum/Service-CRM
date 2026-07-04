@@ -91,7 +91,7 @@ def update_template(
     if "content_template" in data:
         template.content_template = data["content_template"]
 
-    template.updated_at = datetime.utcnow()
+    template.updated_at = datetime.now()
     session.add(template)
     session.commit()
     session.refresh(template)

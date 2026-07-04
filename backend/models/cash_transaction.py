@@ -39,7 +39,7 @@ class CashTransaction(SQLModel, table=True):
     amount: float = Field(description="Сумма (положительная для прихода, отрицательная для расхода)")
     comment: Optional[str] = Field(default=None, sa_column=Column(Text), description="Комментарий")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(default_factory=datetime.now, index=True)
     created_by: int = Field(foreign_key="users.id", description="Кто провёл операцию")
 
     shift: Optional["CashShift"] = Relationship(back_populates="transactions")

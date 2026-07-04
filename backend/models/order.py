@@ -51,7 +51,7 @@ class Order(SQLModel, table=True):
     acceptor_id: Optional[int] = Field(default=None, foreign_key="users.id")
     
     # === Даты ===
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(default_factory=datetime.now, index=True)
     ready_at: Optional[datetime] = Field(default=None)
     issued_at: Optional[datetime] = Field(default=None)
     

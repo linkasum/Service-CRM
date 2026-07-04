@@ -126,7 +126,7 @@ def update_part(
     for key, value in update_data.items():
         setattr(part, key, value)
     
-    part.updated_at = datetime.utcnow()
+    part.updated_at = datetime.now()
     
     session.add(part)
     session.commit()
@@ -208,8 +208,8 @@ def part_movement(
                 order_id=movement.order_id,
                 calculated_amount=-(added_cost * 0.4),
                 status="deducted",
-                period_start=datetime.utcnow(),
-                period_end=datetime.utcnow(),
+                period_start=datetime.now(),
+                period_end=datetime.now(),
                 comment=f"Списание запчасти: {part.name} x{movement.quantity} = {added_cost}руб",
             )
             session.add(master_deduction)
@@ -231,7 +231,7 @@ def part_movement(
     else:
         raise HTTPException(status_code=400, detail="Недопустимый тип движения")
     
-    part.updated_at = datetime.utcnow()
+    part.updated_at = datetime.now()
     session.add(part)
     session.commit()
     session.refresh(part)

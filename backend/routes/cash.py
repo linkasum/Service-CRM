@@ -179,7 +179,7 @@ def close_shift(
     diff = final_amount - cash_balance
     
     shift.is_open = False
-    shift.closed_at = datetime.utcnow()
+    shift.closed_at = datetime.now()
     shift.closed_by = current_user.id
     shift.final_amount = final_amount
     
@@ -370,8 +370,8 @@ def create_transaction(
                 order_id=tx.order_id,
                 calculated_amount=salary_amount,
                 status="accrued",
-                period_start=datetime.utcnow().replace(day=1),
-                period_end=datetime.utcnow(),
+                period_start=datetime.now().replace(day=1),
+                period_end=datetime.now(),
                 comment=f"Авто: приход #{tx.id}",
             )
             session.add(salary_record)
@@ -388,8 +388,8 @@ def create_transaction(
                 order_id=tx.order_id,
                 calculated_amount=deduction,
                 status="deducted",
-                period_start=datetime.utcnow().replace(day=1),
-                period_end=datetime.utcnow(),
+                period_start=datetime.now().replace(day=1),
+                period_end=datetime.now(),
                 comment=f"Запчасти: #{tx.order_id}",
             )
             session.add(salary_record)
@@ -505,7 +505,7 @@ def get_monthly_summary(
     Сумма ПРИХОДОВ за текущий календарный месяц.
     Возвращает: общий приход, возвраты, чистый приход.
     """
-    today = datetime.utcnow()
+    today = datetime.now()
     month_start = datetime(today.year, today.month, 1)
     month_label = today.strftime("%Y-%m")
 

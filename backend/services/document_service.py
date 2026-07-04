@@ -265,7 +265,7 @@ class DocumentService:
             )
 
         filename = (
-            f"diagnostic_act_{order.id}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
+            f"diagnostic_act_{order.id}_{datetime.now().strftime('%Y%m%d')}.pdf"
         )
         return self._build_pdf(elements, filename)
 
@@ -274,7 +274,7 @@ class DocumentService:
         font_name = self._register_fonts()
         styles = self._get_styles(font_name)
         company = self.session.exec(select(CompanySettings)).first()
-        now = datetime.utcnow()
+        now = datetime.now()
         acceptor = (
             self.session.get(User, order.acceptor_id) if order.acceptor_id else None
         )
@@ -579,7 +579,7 @@ class DocumentService:
             )
         )
 
-        filename = f"invoice_{order.id}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
+        filename = f"invoice_{order.id}_{datetime.now().strftime('%Y%m%d')}.pdf"
         return self._build_pdf(elements, filename)
 
     def _parse_html_content(self, html: str, font_name: str) -> list:
@@ -1001,6 +1001,6 @@ class DocumentService:
         elements = self._parse_html_content(content, font_name)
 
         filename = (
-            f"{template_type}_{order.id}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
+            f"{template_type}_{order.id}_{datetime.now().strftime('%Y%m%d')}.pdf"
         )
         return self._build_pdf(elements, filename)

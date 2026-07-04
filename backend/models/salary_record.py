@@ -17,7 +17,7 @@ class SalaryRecord(SQLModel, table=True):
     period_start: datetime = Field(index=True)
     period_end: datetime = Field(index=True)
     comment: Optional[str] = Field(default=None, max_length=500)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
 
     user: Optional["User"] = Relationship(back_populates="salary_records")
     order: Optional["Order"] = Relationship(back_populates="salary_records")

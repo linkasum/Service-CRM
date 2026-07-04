@@ -242,7 +242,7 @@ def get_bot_stats(
     total_users = session.exec(select(func.count(User.id))).one()
 
     # Заказы сегодня
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     orders_today = session.exec(
         select(func.count(Order.id)).where(Order.created_at >= today)
     ).one()

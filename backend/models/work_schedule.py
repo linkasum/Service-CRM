@@ -17,4 +17,4 @@ class WorkSchedule(SQLModel, table=True):
     user_id: int = Field(foreign_key='users.id', index=True)
     date: Optional[date_type] = Field(default=None, sa_column=Column(Date, index=True, nullable=False))
     created_by: Optional[int] = Field(default=None, foreign_key='users.id')
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)

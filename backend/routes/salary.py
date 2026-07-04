@@ -498,8 +498,8 @@ def pay_salary(
         order_id=None,
         calculated_amount=amount,
         status='paid',
-        period_start=datetime.utcnow(),
-        period_end=datetime.utcnow(),
+        period_start=datetime.now(),
+        period_end=datetime.now(),
         comment=comment or f"Выплата зарплаты {user.full_name or user.username}",
     )
     session.add(record)

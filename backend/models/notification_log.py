@@ -10,4 +10,4 @@ class NotificationLog(SQLModel, table=True):
     event_type: str = Field(max_length=50, index=True)
     message: str = Field(max_length=500)
     order_id: Optional[int] = Field(default=None, index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)

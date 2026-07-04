@@ -10,7 +10,7 @@ class CashShift(SQLModel, table=True):
     __tablename__ = "cash_shifts"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    opened_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    opened_at: datetime = Field(default_factory=datetime.now, index=True)
     closed_at: Optional[datetime] = Field(default=None)
     opened_by: int = Field(foreign_key="users.id", index=True)
     closed_by: Optional[int] = Field(default=None)

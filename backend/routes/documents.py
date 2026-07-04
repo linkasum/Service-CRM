@@ -167,40 +167,54 @@ def print_document_html(
     items_rows = []
     idx = 0
     
-    # Услуги
-    if order.service_items:
-        for si in order.service_items:
-            idx += 1
-            price = si.price_at_order or 0
-            qty = si.quantity or 1
-            row_total = price * qty
-            items_rows.append(
-                f'<tr><td>{idx}</td>'
-                f'<td>{si.service_name or "Услуга"}</td>'
-                f'<td style="text-align:right">{order.warranty_days or 30}</td>'
-                f'<td style="text-align:right">{price:.2f}</td>'
-                f'<td style="text-align:right">0.00</td>'
-                f'<td style="text-align:right">{qty}</td>'
-                f'<td style="text-align:right">{row_total:.2f}</td></tr>'
-            )
-    
-    # Запчасти
-    if order.parts:
-        for op in order.parts:
-            idx += 1
-            price = op.price_at_order or 0
-            qty = op.quantity or 1
-            row_total = price * qty
-            part_name = op.part.name if op.part else "Запчасть"
-            items_rows.append(
-                f'<tr><td>{idx}</td>'
-                f'<td>{part_name}</td>'
-                f'<td style="text-align:right">{order.warranty_days or 30}</td>'
-                f'<td style="text-align:right">{price:.2f}</td>'
-                f'<td style="text-align:right">0.00</td>'
-                f'<td style="text-align:right">{qty}</td>'
-                f'<td style="text-align:right">{row_total:.2f}</td></tr>'
-            )
+    # Для work_act — одна строка с общей суммой
+    if template_type == "work_act":
+        service_names = ", ".join(si.service_name for si in order.service_items) if order.service_items else (order.complaint or "Ремонт")
+        total = order.total_cost or 0
+        items_rows.append(
+            f'<tr><td>1</td>'
+            f'<td>{service_names}</td>'
+            f'<td style="text-align:right">{order.warranty_days or 30}</td>'
+            f'<td style="text-align:right">{total:.2f}</td>'
+            f'<td style="text-align:right">0.00</td>'
+            f'<td style="text-align:right">1</td>'
+            f'<td style="text-align:right">{total:.2f}</td></tr>'
+        )
+    else:
+        # Услуги
+        if order.service_items:
+            for si in order.service_items:
+                idx += 1
+                price = si.price_at_order or 0
+                qty = si.quantity or 1
+                row_total = price * qty
+                items_rows.append(
+                    f'<tr><td>{idx}</td>'
+                    f'<td>{si.service_name or "Услуга"}</td>'
+                    f'<td style="text-align:right">{order.warranty_days or 30}</td>'
+                    f'<td style="text-align:right">{price:.2f}</td>'
+                    f'<td style="text-align:right">0.00</td>'
+                    f'<td style="text-align:right">{qty}</td>'
+                    f'<td style="text-align:right">{row_total:.2f}</td></tr>'
+                )
+        
+        # Запчасти
+        if order.parts:
+            for op in order.parts:
+                idx += 1
+                price = op.price_at_order or 0
+                qty = op.quantity or 1
+                row_total = price * qty
+                part_name = op.part.name if op.part else "Запчасть"
+                items_rows.append(
+                    f'<tr><td>{idx}</td>'
+                    f'<td>{part_name}</td>'
+                    f'<td style="text-align:right">{order.warranty_days or 30}</td>'
+                    f'<td style="text-align:right">{price:.2f}</td>'
+                    f'<td style="text-align:right">0.00</td>'
+                    f'<td style="text-align:right">{qty}</td>'
+                    f'<td style="text-align:right">{row_total:.2f}</td></tr>'
+                )
     
     ctx["items_table"] = "\n".join(items_rows) if items_rows else ""
 
@@ -453,7 +467,7 @@ def update_document_status(
 
     doc.status = new_status
     if new_status == "sent" and not doc.sent_at:
-        doc.sent_at = datetime.utcnow()
+        doc.sent_at = datetime.now()
     if data.get("notes") is not None:
         doc.notes = data["notes"]
 

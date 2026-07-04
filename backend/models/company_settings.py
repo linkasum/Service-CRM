@@ -22,7 +22,7 @@ class CompanySettings(SQLModel, table=True):
     email: Optional[str] = Field(default=None, max_length=200)
     logo_path: Optional[str] = Field(default=None, max_length=500)
     review_link: Optional[str] = Field(default=None, max_length=500)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
     def __repr__(self):
         return f"<CompanySettings {self.company_name}>"

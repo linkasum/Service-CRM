@@ -14,7 +14,7 @@ class Document(SQLModel, table=True):
     document_type: str = Field(max_length=50, index=True)  # receipt, diagnostic_act, work_act, invoice
     filename: str = Field(max_length=255)
     status: str = Field(default="generated", max_length=30)  # generated, sent, signed, cancelled
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(default_factory=datetime.now, index=True)
     created_by: Optional[int] = Field(default=None, foreign_key="users.id")
     sent_at: Optional[datetime] = Field(default=None)
     notes: Optional[str] = Field(default=None, max_length=500)

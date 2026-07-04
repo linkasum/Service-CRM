@@ -20,7 +20,7 @@ class OrderComment(SQLModel, table=True):
         default=None, max_length=255, description="Telegram file_id для фото"
     )
     is_system: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)
 
     def __repr__(self):
         return f"<OrderComment #{self.id} order={self.order_id} by={self.username}>"

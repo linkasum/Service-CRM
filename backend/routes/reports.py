@@ -280,7 +280,7 @@ def warranty_report(
     current_user: User = Depends(get_current_user),
 ):
     """Анализ гарантийных случаев"""
-    now = datetime.utcnow()
+    now = datetime.now()
 
     # Активные гарантии
     under_warranty = session.exec(
@@ -407,7 +407,7 @@ def dashboard_summary(
         by_status[o.status] += 1
 
     # Просроченные
-    now = datetime.utcnow()
+    now = datetime.now()
     overdue = sum(1 for o in orders if o.ready_at and o.ready_at < now and o.status not in ("issued", "cancelled"))
 
     # На гарантии

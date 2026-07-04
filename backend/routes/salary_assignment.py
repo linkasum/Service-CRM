@@ -131,7 +131,7 @@ def auto_assign_salary(
             salary_amount = 0
     
     # Создаём запись о начислении
-    now = datetime.utcnow()
+    now = datetime.now()
     pay_start = datetime(now.year, now.month, 1) if now.day <= 15 else datetime(now.year, now.month, 16)
     pay_end = datetime(now.year, now.month, 15, 23, 59, 59) if now.day <= 15 else (
         datetime(now.year, now.month + 1, 1) - timedelta(seconds=1) if now.month < 12 else datetime(now.year + 1, 1, 1) - timedelta(seconds=1)

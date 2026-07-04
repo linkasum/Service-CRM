@@ -182,7 +182,7 @@ def import_orders(session, rows, field_mapping):
                 stats["duplicates"] += 1
                 continue
 
-            created_at = parse_date(v(row, "created_at")) or datetime.utcnow()
+            created_at = parse_date(v(row, "created_at")) or datetime.now()
             issued_at = parse_date(v(row, "issued_at"))
 
             total_cost = 0.0
