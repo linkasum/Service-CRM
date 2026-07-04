@@ -1107,7 +1107,21 @@ const OrderDetailPage: React.FC = () => {
                       <Button
                         type="link"
                         block
-                        onClick={() => addServiceForm.setFieldsValue({ service_id: serviceNameInput })}
+                        onClick={async () => {
+                          const name = serviceNameInput.trim()
+                          if (!name) return
+                          const price = addServiceForm.getFieldValue('price') || 0
+                          try {
+                            const res = await axios.post('/api/services/', { name, price, status: 'active' },
+                              { headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') } })
+                            const newSvc = res.data
+                            setAvailableServices(prev => [...prev, newSvc])
+                            addServiceForm.setFieldsValue({ service_id: newSvc.id })
+                            message.success(`Услуга "${name}" создана`)
+                          } catch (e: any) {
+                            message.error(e.response?.data?.detail || 'Ошибка создания услуги')
+                          }
+                        }}
                       >
                         ➕ Создать &quot;{serviceNameInput}&quot;
                       </Button>
