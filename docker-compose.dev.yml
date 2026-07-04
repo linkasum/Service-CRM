@@ -5,8 +5,8 @@ services:
     image: ghcr.io/sagernet/sing-box:latest
     command: run -c /etc/sing-box/config.json
     ports:
-      - "0.0.0.0:7890:7890"
-      - "0.0.0.0:7890:7890/udp"
+      - "10.20.4.199:7890:7890"
+      - "10.20.4.199:7890:7890/udp"
     volumes:
       - ./sing-box/config.json:/etc/sing-box/config.json:ro
     restart: unless-stopped
@@ -21,6 +21,7 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
+      TZ: Europe/Moscow
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: qwencrm
@@ -39,6 +40,7 @@ services:
       dockerfile: Dockerfile
     command: sh -c "python scripts/init_admin.py && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     environment:
+      TZ: Europe/Moscow
       DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/qwencrm
       SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -52,7 +54,7 @@ services:
       ALL_PROXY: "${TELEGRAM_SOCKS_PROXY_URL:-http://device-proxy:7890}"
       NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1,::1,postgres,backend,frontend,telegram-proxy,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}"
     ports:
-      - "0.0.0.0:8000:8000"
+      - "10.20.4.199:8000:8000"
     depends_on:
       device-proxy:
         condition: service_started
@@ -70,11 +72,12 @@ services:
     image: node:20-alpine
     working_dir: /app
     environment:
+      TZ: Europe/Moscow
       VITE_API_URL: /api
       VITE_PROXY_TARGET: http://backend:8000
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     ports:
-      - "0.0.0.0:5173:5173"
+      - "10.20.4.199:5173:5173"
     depends_on:
       - backend
     volumes:
@@ -89,6 +92,7 @@ services:
     command: python run_bot.py
     profiles: ["bot"]
     environment:
+      TZ: Europe/Moscow
       DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/qwencrm
       SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -117,10 +121,11 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     environment:
+      TZ: Europe/Moscow
       PGADMIN_DEFAULT_EMAIL: admin@qwencrm.com
       PGADMIN_DEFAULT_PASSWORD: admin123
     ports:
-      - "0.0.0.0:5050:80"
+      - "10.20.4.199:5050:80"
     restart: unless-stopped
 
 
