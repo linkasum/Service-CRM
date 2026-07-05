@@ -202,6 +202,9 @@ const OrdersPage: React.FC = () => {
         </div>
       ),
     },
+    { title: 'Вид устройства', dataIndex: 'device_category', key: 'device_category', width: 120,
+      render: (v: string) => <span style={{fontSize: 11}}>{v || '—'}</span>,
+    },
     { title: 'Устройство', key: 'device', width: 140,
       render: (_: any, r: Order) => (
         <div onClick={() => navigate(`/orders/${r.id}`)} style={{ cursor: 'pointer', fontSize: 12 }}>
