@@ -310,6 +310,9 @@ def print_document_html(
             .print-button:hover {{
                 background: #40a9ff;
             }}
+            .title-line strong {{
+                font-size: 200%;
+            }}
         </style>
         <style>
             {template_styles}
@@ -323,6 +326,9 @@ def print_document_html(
     """
     
     from fastapi.responses import HTMLResponse
+    
+    _get_or_create_document(session, order_id, template_type, f"{template_type}_{order_id}.html", current_user)
+    
     return HTMLResponse(content=full_html, media_type="text/html")
 
 
@@ -703,12 +709,28 @@ def generate_from_template(
 @router.get("/download", summary="Скачать PDF документ")
 def download_document(
     filename: str = Query(..., description="Имя файла для скачивания"),
-    current_user: User = Depends(get_current_user),
+    token: Optional[str] = Query(None, description="JWT токен для авторизации"),
+    session: Session = Depends(get_session),
 ):
     """
     Скачать сгенерированный PDF документ.
-    Открывать в новой вкладке: GET /api/documents/download?filename=receipt_1.pdf
+    Открывать в новой вкладке: GET /api/documents/download?filename=receipt_1.pdf&token=xxx
     """
+    from core.security import decode_token
+    
+    if token:
+        try:
+            payload = decode_token(token)
+            username: str = payload.get("sub")
+            if username:
+                user = session.exec(select(User).where(User.username == username)).first()
+                if not user:
+                    raise HTTPException(status_code=401, detail="Пользователь не найден")
+        except Exception:
+            raise HTTPException(status_code=401, detail="Неверный токен")
+    else:
+        raise HTTPException(status_code=401, detail="Требуется токен авторизации (параметр ?token=)")
+    
     filepath = os.path.join(DOCUMENTS_DIR, filename)
     abs_path = _validate_filepath(filepath)
 
