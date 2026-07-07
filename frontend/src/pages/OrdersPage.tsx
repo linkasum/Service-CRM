@@ -79,6 +79,7 @@ const OrdersPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(20)
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState<string | undefined>()
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
   const [masters, setMasters] = useState<any[]>([])
   const [masterFilter, setMasterFilter] = useState<number | undefined>()
   const [activeStatuses, setActiveStatuses] = useState<string[]>([])
@@ -142,7 +143,7 @@ const OrdersPage: React.FC = () => {
       if (masterFilter) params.master_id = masterFilter
       if (searchText) params.search = searchText
       const data = await getOrders(params)
-      if (data.items) { setOrders(data.items); setTotal(data.total) }
+      if (data.items) { setOrders(data.items); setTotal(data.total); setStatusCounts(data.status_counts || {}) }
       else { setOrders(data); setTotal(data.length) }
     } catch { message.error('Ошибка загрузки заказов') }
     finally { setLoading(false) }
@@ -179,13 +180,11 @@ const OrdersPage: React.FC = () => {
   }
 
   const getQuickFilters = () => {
-    const counts: Record<string, number> = {}
-    orders.forEach(o => { counts[o.status] = (counts[o.status] || 0) + 1 })
     return statusList.map(s => ({
       value: s.value,
       label: s.label,
       color: s.border,
-      count: counts[s.value] || 0,
+      count: statusCounts[s.value] || 0,
       active: activeStatuses.includes(s.value) || activeStatuses.length === 0,
     }))
   }
@@ -197,31 +196,31 @@ const OrdersPage: React.FC = () => {
     { title: 'Клиент', key: 'client', width: 140,
       render: (_: any, r: Order) => (
         <div onClick={() => navigate(`/orders/${r.id}`)} style={{ cursor: 'pointer' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.2 }}>{r.client_name?.split(' ').slice(0, 2).join(' ') || '—'}</div>
-          <div style={{ fontSize: 11, opacity: 0.7 }}>{r.client_phone}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.2 }}>{r.client_name?.split(' ').slice(0, 2).join(' ') || '—'}</div>
+          <div style={{ fontSize: 13, opacity: 0.7 }}>{r.client_phone}</div>
         </div>
       ),
     },
     { title: 'Вид устройства', dataIndex: 'device_category', key: 'device_category', width: 120,
-      render: (v: string) => <span style={{fontSize: 11}}>{v || '—'}</span>,
+      render: (v: string) => <span style={{fontSize: 13}}>{v || '—'}</span>,
     },
     { title: 'Устройство', key: 'device', width: 140,
       render: (_: any, r: Order) => (
-        <div onClick={() => navigate(`/orders/${r.id}`)} style={{ cursor: 'pointer', fontSize: 12 }}>
+        <div onClick={() => navigate(`/orders/${r.id}`)} style={{ cursor: 'pointer', fontSize: 14 }}>
           <div>{r.device_brand} {r.device_model?.split(' ').slice(0, 2).join(' ')}</div>
         </div>
       ),
     },
     { title: 'Неисправность', key: 'complaint', width: 160,
       render: (_: any, r: Order) => (
-        <Text style={{ fontSize: 11 }}>{r.complaint?.substring(0, 40)}{r.complaint?.length > 40 ? '...' : ''}</Text>
+        <Text style={{ fontSize: 13 }}>{r.complaint?.substring(0, 40)}{r.complaint?.length > 40 ? '...' : ''}</Text>
       ),
     },
     { title: 'Статус', key: 'status', width: 140,
       render: (_: any, r: Order) => {
         const sc = statusList.find(s => s.value === r.status)
         return (
-          <Select value={r.status} size="small" style={{ width: '100%', fontSize: 11 }}
+          <Select value={r.status} size="small" style={{ width: '100%', fontSize: 13 }}
             onChange={(v) => handleStatusChange(r.id, v)}
             options={statusList.map(s => ({ value: s.value, label: (
               <Space><span style={{display:'inline-block',width:6,height:6,borderRadius:'50%',background:s.border}}/>{s.label}</Space>
@@ -231,24 +230,24 @@ const OrdersPage: React.FC = () => {
       },
     },
     { title: 'Мастер', dataIndex: 'master_username', key: 'master', width: 80,
-      render: (v: string) => <span style={{fontSize: 11}}>{v || '—'}</span>
+      render: (v: string) => <span style={{fontSize: 13}}>{v || '—'}</span>
     },
     { title: 'Сумма', dataIndex: 'total_cost', key: 'total', width: 75,
-      render: (v: number) => <span style={{fontSize: 11, fontWeight: 600}}>{v ? `${v.toFixed(0)}₽` : '—'}</span>
+      render: (v: number) => <span style={{fontSize: 13, fontWeight: 600}}>{v ? `${v.toFixed(0)}₽` : '—'}</span>
     },
     { title: 'Запчасти', dataIndex: 'parts_cost', key: 'parts', width: 75,
-      render: (v: number) => <span style={{fontSize: 11}}>{v ? `${v.toFixed(0)}₽` : '—'}</span>
+      render: (v: number) => <span style={{fontSize: 13}}>{v ? `${v.toFixed(0)}₽` : '—'}</span>
     },
     { title: 'Гарантия', key: 'warranty', width: 60,
-      render: (_: any, r: Order) => r.is_warranty ? <Tag color="red" style={{margin:0,fontSize:10}}>🛡{r.warranty_days}д</Tag> : <span style={{fontSize:11,opacity:0.5}}>—</span>
+      render: (_: any, r: Order) => r.is_warranty ? <Tag color="red" style={{margin:0,fontSize: 12}}>🛡{r.warranty_days}д</Tag> : <span style={{fontSize: 13,opacity:0.5}}>—</span>
     },
     { title: 'Дата', dataIndex: 'created_at', key: 'created', width: 55,
-      render: (v: string) => <span style={{fontSize: 11}}>{v ? dayjs(v).format('DD.MM') : '—'}</span>
+      render: (v: string) => <span style={{fontSize: 13}}>{v ? dayjs(v).format('DD.MM') : '—'}</span>
     },
     { title: '💬', key: 'comments', width: 36,
       render: (_: any, r: Order) => (
         <Tooltip title="Комментарии">
-          <Button size="small" icon={<MessageOutlined />} style={{fontSize: 10, padding: '0 4px'}}
+          <Button size="small" icon={<MessageOutlined />} style={{fontSize: 12, padding: '0 4px'}}
             onClick={(e) => { e.stopPropagation(); openComments(r.id, `${r.client_name} #${r.id}`) }} />
         </Tooltip>
       ),
@@ -256,9 +255,9 @@ const OrdersPage: React.FC = () => {
     { title: '⚡', key: 'actions', width: 60,
       render: (_: any, r: Order) => (
         <Space size={2}>
-          <Tooltip title="Открыть"><Button size="small" icon={<EyeOutlined />} style={{fontSize:10,padding:'0 4px'}} onClick={() => navigate(`/orders/${r.id}`)} /></Tooltip>
+          <Tooltip title="Открыть"><Button size="small" icon={<EyeOutlined />} style={{fontSize: 12,padding:'0 4px'}} onClick={() => navigate(`/orders/${r.id}`)} /></Tooltip>
           <Popconfirm title="Удалить?" onConfirm={async () => { try { await deleteOrder(r.id); message.success('Удалено'); fetchOrders() } catch {} }}>
-            <Button size="small" icon={<DeleteOutlined />} danger style={{fontSize:10,padding:'0 4px'}} />
+            <Button size="small" icon={<DeleteOutlined />} danger style={{fontSize: 12,padding:'0 4px'}} />
           </Popconfirm>
         </Space>
       ),

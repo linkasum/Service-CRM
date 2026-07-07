@@ -290,11 +290,30 @@ def get_orders(
         count_query = select(func.count(Order.id)).select_from(query.subquery())
         total = session.exec(count_query).one()
 
+        # Считаем количество по статусам (без пагинации и status_filter)
+        sc_query = select(Order.status, func.count(Order.id)).select_from(Order)
+        if master_id:
+            sc_query = sc_query.where(Order.master_id == master_id)
+        if client_phone:
+            sc_query = sc_query.where(Order.client_phone == client_phone)
+        if search:
+            sc_query = sc_query.where(
+                (Order.client_name.ilike(f"%{search}%")) |
+                (Order.client_phone.ilike(f"%{search}%")) |
+                (Order.device_model.ilike(f"%{search}%")) |
+                (Order.device_brand.ilike(f"%{search}%"))
+            )
+        if current_user.role and current_user.role.name == 'master':
+            sc_query = sc_query.where(Order.master_id == current_user.id)
+        sc_query = sc_query.group_by(Order.status)
+        sc_rows = session.exec(sc_query).all()
+        status_counts = {row[0]: row[1] for row in sc_rows}
+
         query = query.order_by(Order.created_at.desc()).offset(skip).limit(limit)
         orders = session.exec(query).all()
 
         result = [_enrich_order(order, session) for order in orders]
-        return {"items": result, "total": total}
+        return {"items": result, "total": total, "status_counts": status_counts}
     except Exception as e:
         logger.error(f"Ошибка получения заказов: {e}")
         raise HTTPException(status_code=500, detail="Ошибка загрузки заказов")
