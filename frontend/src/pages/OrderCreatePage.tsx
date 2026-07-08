@@ -236,6 +236,19 @@ const OrderCreatePage: React.FC = () => {
     }
   }
 
+  // Форматирование телефона: +79206630690 -> +7 (920) 663-06-90
+  const formatPhone = (val: string): string => {
+    let cleaned = val.replace(/[^\d]/g, '')
+    if (cleaned.startsWith('8')) cleaned = '7' + cleaned.substring(1)
+    if (!cleaned.startsWith('7')) cleaned = '7' + cleaned
+    let f = '+7'
+    if (cleaned.length > 1) f += ' (' + cleaned.substring(1, Math.min(4, cleaned.length))
+    if (cleaned.length >= 4) f += ') ' + cleaned.substring(4, Math.min(7, cleaned.length))
+    if (cleaned.length >= 7) f += '-' + cleaned.substring(7, Math.min(9, cleaned.length))
+    if (cleaned.length >= 9) f += '-' + cleaned.substring(9, Math.min(11, cleaned.length))
+    return f
+  }
+
   // Обработчик изменения значения телефона
   const handlePhoneChange = (phone: string) => {
     console.log('📞 Поиск клиента по телефону:', phone)
@@ -329,6 +342,7 @@ const OrderCreatePage: React.FC = () => {
       // Создаём заказ
       const order = await createOrder({
         ...values,
+        client_phone: values.client_phone ? '+7' + values.client_phone.replace(/[^\d]/g, '').replace(/^7?8?/, '') : values.client_phone,
         device_brand: deviceBrandName,
         accessories: accessoriesString,
         appearance: values.appearance || 'Б/У',
@@ -404,11 +418,9 @@ const OrderCreatePage: React.FC = () => {
                 <Form.Item label={<Text style={{ color: labelColor, fontSize: 12 }}>Телефон *</Text>} name="client_phone" rules={[{ required: true, message: 'Введите телефон' }]}
                   getValueFromEvent={(e) => {
                     let val = e.target.value
-                    let cleaned = val.replace(/[^\d+]/g, '')
-                    if (/^8\d/.test(cleaned)) {
-                      return '+7' + cleaned.substring(1)
-                    }
-                    return val
+                    let cleaned = val.replace(/[^\d]/g, '')
+                    if (cleaned.startsWith('8')) cleaned = '7' + cleaned.substring(1)
+                    return formatPhone(e.target.value)
                   }}>
                   <Input
                     placeholder="+7 (999) 123-45-67"

@@ -75,6 +75,13 @@ const convertStatuses = (statuses: any[]) => {
     })
 }
 
+const fmtPhone = (phone: string): string => {
+  if (!phone) return phone
+  const d = phone.replace(/[^\d]/g, '').replace(/^7?8?/, '')
+  if (d.length < 10) return phone
+  return `+7 (${d.substring(0,3)}) ${d.substring(3,6)}-${d.substring(6,8)}-${d.substring(8,10)}`
+}
+
 const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -833,7 +840,7 @@ const OrderDetailPage: React.FC = () => {
                   style={{ background: cardBg, border: `1px solid ${borderColor}` }}>
                   <Descriptions column={1} size="small" labelStyle={{ color: textSecondary, width: 120 }}>
                     <Descriptions.Item label="Имя"><Text style={{ color: textColor }}>{o.client_name}</Text></Descriptions.Item>
-                    <Descriptions.Item label="Телефон"><a href={`tel:${o.client_phone}`} style={{ color: '#1890ff' }}>{o.client_phone}</a></Descriptions.Item>
+                    <Descriptions.Item label="Телефон"><a href={`tel:${o.client_phone}`} style={{ color: '#1890ff' }}>{fmtPhone(o.client_phone)}</a></Descriptions.Item>
                     <Descriptions.Item label="Почта"><Text style={{ color: textColor }}>{o.client_email || '—'}</Text></Descriptions.Item>
                     <Descriptions.Item label="Возраст клиента"><Text style={{ color: textColor }}>{o.age_group || '—'}</Text></Descriptions.Item>
                     <Descriptions.Item label="Откуда узнал"><Text style={{ color: textColor }}>{o.source || '—'}</Text></Descriptions.Item>

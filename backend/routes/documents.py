@@ -86,7 +86,7 @@ def print_document_html(
     ctx = {
         "order_id": str(order.id),
         "client_name": order.client_name or "",
-        "client_phone": order.client_phone or "",
+        "client_phone": _fmt_phone(order.client_phone),
         "client_email": order.client_email or "",
         "device_model": order.device_model or "",
         "device_brand": order.device_brand or "",
@@ -330,6 +330,18 @@ def print_document_html(
     _get_or_create_document(session, order_id, template_type, f"{template_type}_{order_id}.html", current_user)
     
     return HTMLResponse(content=full_html, media_type="text/html")
+
+
+def _fmt_phone(phone: str) -> str:
+    """Форматировать телефон: +79206630690 -> +7 (920) 663-06-90"""
+    if not phone:
+        return ""
+    import re
+    d = re.sub(r'[^\d]', '', phone)
+    d = re.sub(r'^7?8?', '', d)
+    if len(d) < 10:
+        return phone
+    return f"+7 ({d[0:3]}) {d[3:6]}-{d[6:8]}-{d[8:10]}"
 
 
 def _validate_filepath(filepath: str) -> str:
