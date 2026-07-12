@@ -484,7 +484,7 @@ def pay_salary(
         )
     ).first() or 0
     
-    balance = accrued + deducted - paid  # deducted отрицательный
+    balance = accrued + deducted + paid  # deducted и paid отрицательные
     
     if amount > balance:
         raise HTTPException(
@@ -496,7 +496,7 @@ def pay_salary(
     record = SalaryRecord(
         user_id=user_id,
         order_id=None,
-        calculated_amount=amount,
+        calculated_amount=-amount,
         status='paid',
         period_start=datetime.now(),
         period_end=datetime.now(),
