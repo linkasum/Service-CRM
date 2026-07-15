@@ -252,25 +252,40 @@ def devices_analytics(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    """По брендам, категориям и моделям"""
+    """По категориям, брендам и моделям с выручкой"""
     orders = session.exec(select(Order)).all()
 
-    by_category = defaultdict(int)
-    by_brand = defaultdict(int)
+    by_category: dict[str, dict] = {}
+    by_brand: dict[str, dict] = {}
     by_model = defaultdict(int)
 
     for o in orders:
-        if hasattr(o, 'device_category') and o.device_category:
-            by_category[o.device_category] += 1
-        if hasattr(o, 'device_brand') and o.device_brand:
-            by_brand[o.device_brand] += 1
+        cat = (o.device_category or '').strip()
+        if cat and cat.lower() != 'phone':
+            cat_name = cat
+        elif cat.lower() == 'phone':
+            cat_name = 'Телефон'
+        else:
+            cat_name = 'Не указано'
+
+        if cat_name not in by_category:
+            by_category[cat_name] = {"count": 0, "revenue": 0.0}
+        by_category[cat_name]["count"] += 1
+        by_category[cat_name]["revenue"] += o.total_cost or 0
+
+        brand = (o.device_brand or '').strip() or 'Не указан'
+        if brand not in by_brand:
+            by_brand[brand] = {"count": 0, "revenue": 0.0}
+        by_brand[brand]["count"] += 1
+        by_brand[brand]["revenue"] += o.total_cost or 0
+
         if o.device_model:
             by_model[o.device_model] += 1
 
     return {
-        "by_category": dict(by_category),
-        "by_brand": dict(by_brand),
-        "top_models": sorted(by_model.items(), key=lambda x: x[1], reverse=True)[:15],
+        "by_category": {k: v for k, v in sorted(by_category.items(), key=lambda x: x[1]["count"], reverse=True)},
+        "by_brand": {k: v for k, v in sorted(by_brand.items(), key=lambda x: x[1]["count"], reverse=True)},
+        "top_models": sorted(by_model.items(), key=lambda x: x[1], reverse=True)[:10],
     }
 
 

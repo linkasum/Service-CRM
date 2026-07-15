@@ -122,8 +122,9 @@ const ClientsAnalyticsReport: React.FC<{ data: any }> = ({ data }) => {
 
 const DevicesAnalyticsReport: React.FC<{ data: any }> = ({ data }) => {
   if (!data) return <Spin />
-  const catData = Object.entries(data.by_category || {}).map(([name, value]) => ({ name, value: value as number }))
-  const brandData = Object.entries(data.by_brand || {}).map(([name, value]) => ({ name, value: value as number }))
+  const catData = Object.entries(data.by_category || {}).map(([name, v]: any) => ({ name, value: v.count }))
+  const brandData = Object.entries(data.by_brand || {}).map(([name, v]: any) => ({ name, value: v.count }))
+  const catTable = Object.entries(data.by_category || {}).map(([name, v]: any) => ({ name, count: v.count, revenue: v.revenue }))
   return (
     <div>
       <Row gutter={[16, 16]}>
@@ -142,9 +143,17 @@ const DevicesAnalyticsReport: React.FC<{ data: any }> = ({ data }) => {
           </Card>
         </Col>
       </Row>
+      <Card title="Категории: заказы и выручка" style={{ marginTop: 16 }} size="small">
+        <Table dataSource={catTable} rowKey="name" pagination={false} columns={[
+          { title: 'Категория', dataIndex: 'name', key: 'name' },
+          { title: 'Заказов', dataIndex: 'count', key: 'count', sorter: (a: any, b: any) => a.count - b.count },
+          { title: 'Выручка', dataIndex: 'revenue', key: 'revenue', render: (v: number) => `${v.toLocaleString('ru-RU')} ₽`, sorter: (a: any, b: any) => a.revenue - b.revenue },
+          { title: 'Средний чек', key: 'avg', render: (_: any, r: any) => r.count > 0 ? `${Math.round(r.revenue / r.count).toLocaleString('ru-RU')} ₽` : '—' },
+        ]} />
+      </Card>
       {(data.top_models?.length ?? 0) > 0 && (
-        <Card title="Топ модели" style={{ marginTop: 16 }}>
-          <List dataSource={data.top_models.slice(0, 10)} renderItem={(item: any) => (<List.Item><List.Item.Meta title={item[0]} description={`Заказов: ${item[1]}`} /><Tag color="blue">{item[1]}</Tag></List.Item>)} />
+        <Card title="Топ-10 моделей" style={{ marginTop: 16 }} size="small">
+          <List dataSource={data.top_models.slice(0, 10)} renderItem={(item: any) => (<List.Item><List.Item.Meta title={item[0]} /><Tag color="blue">{item[1]}</Tag></List.Item>)} />
         </Card>
       )}
     </div>
