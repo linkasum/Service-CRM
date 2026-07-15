@@ -68,7 +68,7 @@ const OrdersAnalyticsReport: React.FC<{ data: any }> = ({ data }) => {
 
 const FinancialReport: React.FC<{ data: any }> = ({ data }) => {
   if (!data) return <Spin />
-  const dayData = (data.by_day || []).slice(-14)
+  const dayData = Array.isArray(data.by_day) ? data.by_day.slice(-14) : []
   const masterData = data.master_revenue || []
   return (
     <div>
