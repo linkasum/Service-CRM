@@ -149,8 +149,8 @@ def financial_report(
     total_revenue = sum(o.total_cost or 0 for o in orders)
     total_parts_cost = sum(o.parts_cost or 0 for o in orders)
 
-    # Прибыль = все доходы - все расходы (включая ЗП)
-    company_profit = total_income - total_expense - total_salary_paid
+    # Прибыль = доходы - расходы (ЗП уже в расходах)
+    company_profit = total_income - total_expense
 
     # По дням
     by_day = defaultdict(lambda: {"cash": 0.0, "card": 0.0, "expense": 0.0, "salary": 0.0, "revenue": 0.0})
