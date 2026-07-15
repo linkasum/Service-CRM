@@ -279,40 +279,32 @@ def warranty_report(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    """Анализ гарантийных случаев"""
+    """Анализ гарантийных заказов"""
     now = datetime.now()
 
-    # Активные гарантии
-    under_warranty = session.exec(
-        select(Order).where(
-            Order.status == "issued",
-            Order.warranty_until > now,
-            Order.warranty_days > 0,
-        )
+    all_warranty = session.exec(
+        select(Order).where(Order.is_warranty == True).order_by(Order.created_at.desc())
     ).all()
 
-    # Истёкшие гарантии
-    expired_warranty = session.exec(
-        select(Order).where(
-            Order.status == "issued",
-            Order.warranty_until < now,
-            Order.warranty_days > 0,
-        )
-    ).all()
+    active = [o for o in all_warranty if o.warranty_until and o.warranty_until > now]
+    expired = [o for o in all_warranty if o.warranty_until and o.warranty_until <= now]
 
     return {
-        "active_warranty": len(under_warranty),
-        "expired_warranty": len(expired_warranty),
+        "total": len(all_warranty),
+        "active_warranty": len(active),
+        "expired_warranty": len(expired),
         "orders": [
             {
                 "id": o.id,
                 "client": o.client_name,
-                "device": o.device_model,
-                "warranty_days": o.warranty_days,
+                "device": f"{o.device_brand or ''} {o.device_model or ''}".strip(),
+                "status": o.status,
+                "warranty_days": o.warranty_days or 0,
                 "warranty_until": o.warranty_until.isoformat() if o.warranty_until else None,
                 "days_left": (o.warranty_until - now).days if o.warranty_until else 0,
+                "total_cost": o.total_cost,
             }
-            for o in under_warranty
+            for o in all_warranty
         ],
     }
 
@@ -325,7 +317,7 @@ def time_analytics(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    """Динамика по дням/неделям/месяцам"""
+    """Динамика по дням/неделям/месяцам + средний срок ремонта"""
     date_from_dt, date_to_dt = _parse_date_range(date_from, date_to)
 
     query = select(Order)
@@ -335,7 +327,33 @@ def time_analytics(
         query = query.where(Order.created_at <= date_to_dt)
     orders = session.exec(query).all()
 
-    by_period = defaultdict(lambda: {"orders": 0, "revenue": 0, "issued": 0})
+    # Средний срок ремонта: issued_at - created_at для выданных заказов
+    issued = [o for o in orders if o.status == "issued" and o.created_at and o.issued_at]
+    repair_times = [(o.issued_at - o.created_at).total_seconds() / 3600 for o in issued]  # часы
+
+    avg_repair_hours = sum(repair_times) / len(repair_times) if repair_times else 0
+
+    # По мастерам
+    master_times = defaultdict(list)
+    for o in issued:
+        if o.master_id:
+            master_times[o.master_id].append((o.issued_at - o.created_at).total_seconds() / 3600)
+
+    masters_avg = []
+    for mid, times in master_times.items():
+        master = session.get(User, mid)
+        name = (master.full_name or master.username) if master else f"ID {mid}"
+        masters_avg.append({
+            "master_id": mid,
+            "master_name": name,
+            "orders": len(times),
+            "avg_hours": round(sum(times) / len(times), 1),
+            "avg_days": round(sum(times) / len(times) / 24, 1),
+        })
+    masters_avg.sort(key=lambda x: x["orders"], reverse=True)
+
+    # По периодам
+    by_period = defaultdict(lambda: {"orders": 0, "revenue": 0, "issued": 0, "repair_hours": []})
     for o in orders:
         if period == "day":
             key = o.created_at.strftime("%Y-%m-%d")
@@ -350,13 +368,28 @@ def time_analytics(
         by_period[key]["revenue"] += o.total_cost or 0
         if o.status == "issued":
             by_period[key]["issued"] += 1
+        if o.status == "issued" and o.created_at and o.issued_at:
+            by_period[key]["repair_hours"].append((o.issued_at - o.created_at).total_seconds() / 3600)
 
-    # Сортировка по дате
     sorted_data = sorted(by_period.items(), key=lambda x: x[0])
+    chart_data = []
+    for k, v in sorted_data:
+        avg_h = sum(v["repair_hours"]) / len(v["repair_hours"]) if v["repair_hours"] else 0
+        chart_data.append({
+            "date": k,
+            "orders": v["orders"],
+            "revenue": round(v["revenue"], 2),
+            "issued": v["issued"],
+            "avg_repair_days": round(avg_h / 24, 1),
+        })
 
     return {
         "period": period,
-        "data": [{"date": k, **v} for k, v in sorted_data],
+        "avg_repair_hours": round(avg_repair_hours, 1),
+        "avg_repair_days": round(avg_repair_hours / 24, 1),
+        "total_issued": len(issued),
+        "masters_avg": masters_avg,
+        "data": chart_data,
     }
 
 
