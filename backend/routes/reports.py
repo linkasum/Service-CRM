@@ -127,10 +127,18 @@ def financial_report(
 
     cash_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.cash)
     card_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.card)
-    cash_expense = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.cash)
-    card_expense = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.card)
+
+    # Расходы: запчасти (с order_id) отдельно от ЗП (без order_id)
+    parts_cash = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.cash and t.order_id is not None)
+    parts_card = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.card and t.order_id is not None)
+    other_cash = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.cash and t.order_id is None)
+    other_card = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.card and t.order_id is None)
+
+    cash_expense = parts_cash + other_cash
+    card_expense = parts_card + other_card
     total_income = cash_income + card_income
     total_expense = cash_expense + card_expense
+    total_parts_expense = parts_cash + parts_card
 
     # ЗП (только выплаты — статус paid)
     salary_query = select(SalaryRecord).where(SalaryRecord.status == 'paid')
@@ -188,6 +196,7 @@ def financial_report(
         "card_expense": round(card_expense, 2),
         "total_expense": round(total_expense, 2),
         "total_salary_paid": round(total_salary_paid, 2),
+        "total_parts_expense": round(total_parts_expense, 2),
         "company_profit": round(company_profit, 2),
         "total_revenue": round(total_revenue, 2),
         "total_parts_cost": round(total_parts_cost, 2),

@@ -81,7 +81,7 @@ const FinancialReport: React.FC<{ data: any }> = ({ data }) => {
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={6}><Card><Statistic title="Общий доход" value={data.total_income} precision={0} suffix="₽" valueStyle={{ color: '#52c41a' }} /></Card></Col>
         <Col span={6}><Card><Statistic title="Выручка с заказов" value={data.total_revenue} precision={0} suffix="₽" valueStyle={{ color: '#722ed1' }} /></Card></Col>
-        <Col span={6}><Card><Statistic title="Запчасти" value={data.total_parts_cost} precision={0} suffix="₽" valueStyle={{ color: '#cf1322' }} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Запчасти (расход)" value={data.total_parts_expense || data.total_parts_cost} precision={0} suffix="₽" valueStyle={{ color: '#cf1322' }} /></Card></Col>
         <Col span={6}><Card><Statistic title="Прибыль компании" value={data.company_profit} precision={0} suffix="₽" valueStyle={{ color: data.company_profit >= 0 ? '#3f8600' : '#f5222d' }} /></Card></Col>
       </Row>
       <Card title="Доходы и расходы по дням" style={{ marginTop: 16 }}>
