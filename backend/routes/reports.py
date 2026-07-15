@@ -14,6 +14,7 @@ from models.role import Role
 from models.part import Part
 from models.salary_record import SalaryRecord
 from models.order_payment import OrderPayment
+from models.cash_transaction import CashTransaction, TransactionType, PaymentMethod
 from core.logging import logger
 from collections import defaultdict
 
