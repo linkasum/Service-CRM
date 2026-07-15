@@ -188,6 +188,53 @@ def close_shift(
     
     logger.info(f"Кассовая смена #{shift.id} закрыта, итог: {final_amount}₽")
 
+    # Авто-ЗП: для всех приходов смены, у которых ещё нет начислений
+    for t in transactions:
+        if t.transaction_type == TransactionType.income and t.order_id and t.amount > 0:
+            order = session.get(Order, t.order_id)
+            if order and order.master_id:
+                existing = session.exec(
+                    select(SalaryRecord).where(
+                        SalaryRecord.order_id == t.order_id,
+                        SalaryRecord.status == 'accrued',
+                        SalaryRecord.comment.contains(str(t.id)),
+                    )
+                ).first()
+                if not existing:
+                    sr = SalaryRecord(
+                        user_id=order.master_id,
+                        order_id=t.order_id,
+                        calculated_amount=round(t.amount * 0.4),
+                        status='accrued',
+                        period_start=datetime.now().replace(day=1),
+                        period_end=datetime.now(),
+                        comment=f'Авто: приход #{t.id}',
+                    )
+                    session.add(sr)
+        elif t.transaction_type == TransactionType.expense and t.order_id and t.amount < 0:
+            order = session.get(Order, t.order_id)
+            if order and order.master_id:
+                comment_match = f'Запчасти: #{t.order_id}'
+                existing = session.exec(
+                    select(SalaryRecord).where(
+                        SalaryRecord.order_id == t.order_id,
+                        SalaryRecord.status == 'deducted',
+                        SalaryRecord.comment == comment_match,
+                    )
+                ).first()
+                if not existing:
+                    sr = SalaryRecord(
+                        user_id=order.master_id,
+                        order_id=t.order_id,
+                        calculated_amount=-round(abs(t.amount) * 0.4),
+                        status='deducted',
+                        period_start=datetime.now().replace(day=1),
+                        period_end=datetime.now(),
+                        comment=comment_match,
+                    )
+                    session.add(sr)
+    session.commit()
+
     # Начисление зарплаты по графику работы.
     # Рабочий день сервиса: 10:00-20:00. Берём дату открытия смены, а не
     # системную дату закрытия, чтобы позднее закрытие или тестовые смены не
