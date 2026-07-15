@@ -182,7 +182,7 @@ const TimeAnalyticsReport: React.FC<{ data: any }> = ({ data }) => {
     <div>
       <Row gutter={[16, 16]}>
         <Col span={8}><Card><Statistic title="Выдано заказов" value={data.total_issued ?? 0} valueStyle={{ color: '#1890ff' }} /></Card></Col>
-        <Col span={8}><Card><Statistic title="Средний срок ремонта" value={data.avg_repair_days ?? 0} suffix="дней" valueStyle={{ color: '#52c41a' }} /></Col>
+         <Col span={8}><Card><Statistic title="Средний срок ремонта" value={data.avg_repair_days ?? 0} suffix="дней" valueStyle={{ color: '#52c41a' }} /></Card></Col>
         <Col span={8}><Card><Statistic title="Средний срок (часы)" value={data.avg_repair_hours ?? 0} suffix="ч" precision={1} valueStyle={{ color: '#722ed1' }} /></Card></Col>
       </Row>
       {(data.masters_avg?.length ?? 0) > 0 && (
