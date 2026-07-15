@@ -7,7 +7,7 @@ import {
   CheckCircleOutlined, FilterOutlined, SearchOutlined, SendOutlined, MessageOutlined,
   DownloadOutlined
 } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import axios from 'axios'
 import {
@@ -70,15 +70,16 @@ const getStatusColor = (order: Order, statusList: any[]) => {
 
 const OrdersPage: React.FC = () => {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { mode } = useTheme()
   const isDark = mode === 'dark'
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState<Order[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => Number(searchParams.get('page')) || 1)
   const [pageSize, setPageSize] = useState(20)
-  const [searchText, setSearchText] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string | undefined>()
+  const [searchText, setSearchText] = useState(searchParams.get('search') || '')
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(searchParams.get('status') || undefined)
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
   const [masters, setMasters] = useState<any[]>([])
   const [masterFilter, setMasterFilter] = useState<number | undefined>()
@@ -89,6 +90,16 @@ const OrdersPage: React.FC = () => {
   const [commentText, setCommentText] = useState('')
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [statusList, setStatusList] = useState<any[]>(DEFAULT_STATUSES)
+
+  // Синхронизация фильтров с URL
+  useEffect(() => {
+    const params: Record<string, string> = {}
+    if (statusFilter) params.status = statusFilter
+    if (masterFilter) params.master = String(masterFilter)
+    if (searchText) params.search = searchText
+    if (page > 1) params.page = String(page)
+    setSearchParams(params, { replace: true })
+  }, [statusFilter, masterFilter, searchText, page])
 
   // Загружаем статусы из БД при старте
   useEffect(() => {
