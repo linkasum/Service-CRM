@@ -670,6 +670,9 @@ const ReportsPage: React.FC = () => {
         case 'time':
           result = await api.get('/reports/time-analytics', { params: { ...params, period: 'day' } })
           break
+        case 'marketing':
+          result = await api.get('/reports/marketing', { params })
+          break
         default:
           result = { data: {} }
       }
@@ -699,6 +702,9 @@ const ReportsPage: React.FC = () => {
       setDateRange([dates[0], dates[1]])
     }
   }
+
+  const dateFrom = dateRange[0]?.format('YYYY-MM-DD')
+  const dateTo = dateRange[1]?.format('YYYY-MM-DD')
 
   const config = REPORTS_CONFIG.find(r => r.key === activeReport)
   const Component = config?.component || (() => <div>Отчёт не найден</div>)
@@ -733,7 +739,7 @@ const ReportsPage: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} md={18}>
-          <Spin spinning={loading}><Component data={reportData} /></Spin>
+          <Spin spinning={loading}><Component data={reportData} dateFrom={dateFrom} dateTo={dateTo} /></Spin>
         </Col>
       </Row>
     </div>
