@@ -262,6 +262,8 @@ def get_orders(
     master_id: Optional[int] = Query(None),
     client_phone: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(get_session),
@@ -270,6 +272,11 @@ def get_orders(
     """Получить список заказов с фильтрацией и поиском"""
     try:
         query = select(Order)
+
+        if date_from:
+            query = query.where(Order.created_at >= datetime.fromisoformat(date_from))
+        if date_to:
+            query = query.where(Order.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
 
         if status_filter:
             query = query.where(Order.status == status_filter)
@@ -292,6 +299,10 @@ def get_orders(
 
         # Считаем количество по статусам (без пагинации и status_filter)
         sc_query = select(Order.status, func.count(Order.id)).select_from(Order)
+        if date_from:
+            sc_query = sc_query.where(Order.created_at >= datetime.fromisoformat(date_from))
+        if date_to:
+            sc_query = sc_query.where(Order.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
         if master_id:
             sc_query = sc_query.where(Order.master_id == master_id)
         if client_phone:

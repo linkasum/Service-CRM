@@ -149,7 +149,7 @@ const OrdersPage: React.FC = () => {
   const fetchOrders = async () => {
     setLoading(true)
     try {
-      const params: any = { skip: (page - 1) * pageSize, limit: pageSize }
+      const params: any = { skip: (page - 1) * pageSize, limit: pageSize, date_from: dayjs().subtract(30, 'day').format('YYYY-MM-DD') }
       if (statusFilter) params.status = statusFilter
       if (masterFilter) params.master_id = masterFilter
       if (searchText) params.search = searchText
