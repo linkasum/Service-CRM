@@ -105,69 +105,95 @@ def financial_report(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    """Доходы, расходы, прибыль"""
+    """Доходы, расходы, прибыль, касса, ЗП"""
     date_from_dt, date_to_dt = _parse_date_range(date_from, date_to)
 
+    # Заказы
     query = select(Order).where(Order.status == "issued")
     if date_from_dt:
         query = query.where(Order.created_at >= date_from_dt)
     if date_to_dt:
         query = query.where(Order.created_at <= date_to_dt)
-
     orders = session.exec(query).all()
 
-    # Возвраты
-    from models.order_payment import PaymentType
-    refunds_query = select(OrderPayment).where(OrderPayment.payment_type == PaymentType.refund)
+    # Транзакции
+    tx_query = select(CashTransaction)
     if date_from_dt:
-        refunds_query = refunds_query.where(OrderPayment.created_at >= date_from_dt)
+        tx_query = tx_query.where(CashTransaction.created_at >= date_from_dt)
     if date_to_dt:
-        refunds_query = refunds_query.where(OrderPayment.created_at <= date_to_dt)
-    refunds = session.exec(refunds_query).all()
-    total_refunds = sum(abs(p.amount) for p in refunds)
+        tx_query = tx_query.where(CashTransaction.created_at <= date_to_dt)
+    transactions = session.exec(tx_query).all()
+
+    cash_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.cash)
+    card_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.card)
+    cash_expense = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.cash)
+    card_expense = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.card)
+    total_income = cash_income + card_income
+    total_expense = cash_expense + card_expense
+
+    # ЗП (только выплаты — статус paid)
+    salary_query = select(SalaryRecord).where(SalaryRecord.status == 'paid')
+    if date_from_dt:
+        salary_query = salary_query.where(SalaryRecord.created_at >= date_from_dt)
+    if date_to_dt:
+        salary_query = salary_query.where(SalaryRecord.created_at <= date_to_dt)
+    salary_records = session.exec(salary_query).all()
+    total_salary_paid = sum(abs(r.calculated_amount) for r in salary_records)
+    salary_by_user = defaultdict(float)
+    for r in salary_records:
+        user = session.get(User, r.user_id)
+        name = (user.full_name or user.username) if user else f"ID {r.user_id}"
+        salary_by_user[name] += abs(r.calculated_amount)
 
     total_revenue = sum(o.total_cost or 0 for o in orders)
     total_parts_cost = sum(o.parts_cost or 0 for o in orders)
-    total_work_cost = sum(o.work_cost or 0 for o in orders)
-    gross_profit = total_revenue - total_parts_cost
-    net_profit = gross_profit - total_refunds  # Чистая прибыль с учётом возвратов
 
-    # Зарплатные выплаты
-    salary_query = select(SalaryRecord)
-    if date_from_dt:
-        salary_query = salary_query.where(SalaryRecord.period_start >= date_from_dt)
-    if date_to_dt:
-        salary_query = salary_query.where(SalaryRecord.period_end <= date_to_dt)
-    salary_records = session.exec(salary_query).all()
-    total_salary = sum(r.calculated_amount for r in salary_records)
+    # Прибыль = все доходы - все расходы (включая ЗП)
+    company_profit = total_income - total_expense - total_salary_paid
 
-    # Доход по дням
-    by_day = defaultdict(lambda: {"revenue": 0, "parts": 0, "profit": 0, "refunds": 0})
+    # По дням
+    by_day = defaultdict(lambda: {"cash": 0.0, "card": 0.0, "expense": 0.0, "salary": 0.0, "revenue": 0.0})
+    for t in transactions:
+        day = t.created_at.strftime("%Y-%m-%d")
+        if t.transaction_type == TransactionType.income:
+            if t.payment_method == PaymentMethod.cash:
+                by_day[day]["cash"] += t.amount
+            else:
+                by_day[day]["card"] += t.amount
+        else:
+            by_day[day]["expense"] += abs(t.amount)
+    for r in salary_records:
+        day = r.created_at.strftime("%Y-%m-%d")
+        by_day[day]["salary"] += abs(r.calculated_amount)
     for o in orders:
         day = o.created_at.strftime("%Y-%m-%d")
         by_day[day]["revenue"] += o.total_cost or 0
-        by_day[day]["parts"] += o.parts_cost or 0
-        by_day[day]["profit"] += (o.total_cost or 0) - (o.parts_cost or 0)
-    
-    # Возвраты по дням
-    for r in refunds:
-        if r.order_id:
-            order = session.get(Order, r.order_id)
-            if order:
-                day = r.created_at.strftime("%Y-%m-%d")
-                by_day[day]["refunds"] += abs(r.amount)
+
+    # По мастерам
+    master_revenue = defaultdict(lambda: {"orders": 0, "revenue": 0.0, "parts": 0.0})
+    for o in orders:
+        if o.master_id:
+            user = session.get(User, o.master_id)
+            name = (user.full_name or user.username) if user else "Без мастера"
+            master_revenue[name]["orders"] += 1
+            master_revenue[name]["revenue"] += o.total_cost or 0
+            master_revenue[name]["parts"] += o.parts_cost or 0
 
     return {
+        "cash_income": round(cash_income, 2),
+        "card_income": round(card_income, 2),
+        "total_income": round(total_income, 2),
+        "cash_expense": round(cash_expense, 2),
+        "card_expense": round(card_expense, 2),
+        "total_expense": round(total_expense, 2),
+        "total_salary_paid": round(total_salary_paid, 2),
+        "company_profit": round(company_profit, 2),
         "total_revenue": round(total_revenue, 2),
         "total_parts_cost": round(total_parts_cost, 2),
-        "total_work_cost": round(total_work_cost, 2),
-        "total_refunds": round(total_refunds, 2),  # Сумма возвратов
-        "gross_profit": round(gross_profit, 2),
-        "net_profit": round(net_profit, 2),  # С учётом возвратов
-        "total_salary": round(total_salary, 2),
         "orders_count": len(orders),
-        "avg_order_value": round(total_revenue / len(orders), 2) if orders else 0,
-        "by_day": dict(by_day),
+        "salary_by_user": dict(salary_by_user),
+        "master_revenue": [{"name": k, **v} for k, v in sorted(master_revenue.items(), key=lambda x: x[1]["revenue"], reverse=True)],
+        "by_day": [{"date": k, **v} for k, v in sorted(by_day.items())],
     }
 
 

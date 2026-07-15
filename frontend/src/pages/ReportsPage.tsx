@@ -68,25 +68,42 @@ const OrdersAnalyticsReport: React.FC<{ data: any }> = ({ data }) => {
 
 const FinancialReport: React.FC<{ data: any }> = ({ data }) => {
   if (!data) return <Spin />
-  const dayData = Object.entries(data.by_day || {}).sort((a, b) => a[0].localeCompare(b[0])).slice(-14).map(([date, v]: [string, any]) => ({ date, revenue: v.revenue, profit: v.profit, refunds: v.refunds || 0 }))
+  const dayData = (data.by_day || []).slice(-14)
+  const masterData = data.master_revenue || []
   return (
     <div>
       <Row gutter={[16, 16]}>
-        <Col span={6}><Card><Statistic title="Доход" value={data.total_revenue} precision={2} prefix={<DollarOutlined />} suffix="₽" valueStyle={{ color: '#3f8600' }} /></Card></Col>
-        <Col span={6}><Card><Statistic title="Запчасти" value={data.total_parts_cost} precision={2} prefix={<ToolOutlined />} suffix="₽" valueStyle={{ color: '#cf1322' }} /></Card></Col>
-        <Col span={6}><Card><Statistic title="Возвраты" value={data.total_refunds || 0} precision={2} prefix={<MinusOutlined />} suffix="₽" valueStyle={{ color: '#f5222d' }} /></Card></Col>
-        <Col span={6}><Card><Statistic title="Валовая прибыль" value={data.gross_profit} precision={2} prefix={<RiseOutlined />} suffix="₽" valueStyle={{ color: '#1890ff' }} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Доход нал" value={data.cash_income} precision={0} suffix="₽" valueStyle={{ color: '#3f8600' }} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Доход безнал" value={data.card_income} precision={0} suffix="₽" valueStyle={{ color: '#1890ff' }} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Расходы" value={data.total_expense} precision={0} suffix="₽" valueStyle={{ color: '#cf1322' }} /></Card></Col>
+        <Col span={6}><Card><Statistic title="ЗП выплачено" value={data.total_salary_paid} precision={0} suffix="₽" valueStyle={{ color: '#fa8c16' }} /></Card></Col>
       </Row>
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col span={8}><Card><Statistic title="Зарплата" value={data.total_salary || 0} precision={2} prefix={<WalletOutlined />} suffix="₽" valueStyle={{ color: '#fa8c16' }} /></Card></Col>
-        <Col span={8}><Card><Statistic title="Чистая прибыль (до вычета зарплаты)" value={(data.gross_profit - (data.total_refunds || 0))} precision={2} prefix={<WalletOutlined />} suffix="₽" valueStyle={{ color: (data.gross_profit - (data.total_refunds || 0)) >= 0 ? '#52c41a' : '#f5222d' }} /></Card></Col>
-        <Col span={8}><Card><Statistic title="Чистая прибыль" value={data.net_profit} precision={2} prefix={<WalletOutlined />} suffix="₽" valueStyle={{ color: data.net_profit >= 0 ? '#722ed1' : '#f5222d' }} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Общий доход" value={data.total_income} precision={0} suffix="₽" valueStyle={{ color: '#52c41a' }} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Выручка с заказов" value={data.total_revenue} precision={0} suffix="₽" valueStyle={{ color: '#722ed1' }} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Запчасти" value={data.total_parts_cost} precision={0} suffix="₽" valueStyle={{ color: '#cf1322' }} /></Card></Col>
+        <Col span={6}><Card><Statistic title="Прибыль компании" value={data.company_profit} precision={0} suffix="₽" valueStyle={{ color: data.company_profit >= 0 ? '#3f8600' : '#f5222d' }} /></Card></Col>
       </Row>
-      <Card title="Доход, прибыль и возвраты по дням" style={{ marginTop: 16 }}>
+      <Card title="Доходы и расходы по дням" style={{ marginTop: 16 }}>
         <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={dayData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" /><YAxis /><Tooltip /><Legend /><Area type="monotone" dataKey="revenue" stroke="#1890ff" fill="#1890ff" fillOpacity={0.3} name="Доход" /><Area type="monotone" dataKey="profit" stroke="#52c41a" fill="#52c41a" fillOpacity={0.3} name="Прибыль" /><Area type="monotone" dataKey="refunds" stroke="#f5222d" fill="#f5222d" fillOpacity={0.2} name="Возвраты" /></AreaChart>
+          <AreaChart data={dayData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" /><YAxis /><Tooltip /><Legend />
+            <Area type="monotone" dataKey="cash" stroke="#3f8600" fill="#3f8600" fillOpacity={0.3} name="Нал" />
+            <Area type="monotone" dataKey="card" stroke="#1890ff" fill="#1890ff" fillOpacity={0.3} name="Безнал" />
+            <Area type="monotone" dataKey="expense" stroke="#cf1322" fill="#cf1322" fillOpacity={0.2} name="Расход" />
+            <Area type="monotone" dataKey="salary" stroke="#fa8c16" fill="#fa8c16" fillOpacity={0.2} name="ЗП" />
+          </AreaChart>
         </ResponsiveContainer>
       </Card>
+      {masterData.length > 0 && (
+        <Card title="По мастерам" style={{ marginTop: 16 }} size="small">
+          <Table dataSource={masterData} rowKey="name" pagination={false} columns={[
+            { title: 'Мастер', dataIndex: 'name', key: 'name' },
+            { title: 'Заказов', dataIndex: 'orders', key: 'orders' },
+            { title: 'Выручка', dataIndex: 'revenue', key: 'revenue', render: (v: number) => `${v.toLocaleString('ru-RU')} ₽` },
+            { title: 'Запчасти', dataIndex: 'parts', key: 'parts', render: (v: number) => `${v.toLocaleString('ru-RU')} ₽` },
+          ]} />
+        </Card>
+      )}
     </div>
   )
 }
