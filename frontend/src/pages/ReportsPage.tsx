@@ -156,18 +156,19 @@ const WarrantyReport: React.FC<{ data: any }> = ({ data }) => {
   return (
     <div>
       <Row gutter={[16, 16]}>
-        <Col span={12}><Card><Statistic title="На гарантии" value={data.active_warranty ?? 0} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#52c41a' }} /></Card></Col>
+        <Col span={12}><Card><Statistic title="Всего гарантийных" value={data.total ?? 0} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#1890ff' }} /></Card></Col>
         <Col span={12}><Card><Statistic title="Гарантия истекла" value={data.expired_warranty ?? 0} prefix={<WarningOutlined />} valueStyle={{ color: '#faad14' }} /></Card></Col>
       </Row>
       {(data.orders?.length ?? 0) > 0 && (
-        <Card title="Активные гарантии" style={{ marginTop: 16 }}>
+        <Card title="Гарантийные заказы" style={{ marginTop: 16 }}>
           <Table dataSource={data.orders} rowKey="id" pagination={false} columns={[
             { title: 'Заказ', dataIndex: 'id', key: 'id', width: 60, render: (v: number) => `#${v}` },
             { title: 'Клиент', dataIndex: 'client', key: 'client' },
             { title: 'Устройство', dataIndex: 'device', key: 'device' },
-            { title: 'Гарантия', dataIndex: 'warranty_days', key: 'warranty_days', width: 100 },
+            { title: 'Статус', dataIndex: 'status', key: 'status' },
+            { title: 'Гарантия', dataIndex: 'warranty_days', key: 'warranty_days', width: 80, render: (v: number) => v > 0 ? `${v} д.` : '—' },
             { title: 'До', dataIndex: 'warranty_until', key: 'warranty_until', render: (v: string) => v ? new Date(v).toLocaleDateString('ru-RU') : '—' },
-            { title: 'Осталось', dataIndex: 'days_left', key: 'days_left', render: (v: number) => (<Tag color={v <= 7 ? 'red' : v <= 14 ? 'orange' : 'green'}>{v} дн.</Tag>) },
+            { title: 'Осталось', dataIndex: 'days_left', key: 'days_left', render: (v: number) => v > 0 ? <Tag color={v <= 7 ? 'red' : v <= 14 ? 'orange' : 'green'}>{v} дн.</Tag> : <Tag>—</Tag> },
           ]} />
         </Card>
       )}
@@ -178,11 +179,27 @@ const WarrantyReport: React.FC<{ data: any }> = ({ data }) => {
 const TimeAnalyticsReport: React.FC<{ data: any }> = ({ data }) => {
   if (!data) return <Spin />
   return (
-    <Card title={`Динамика (${data.period})`}>
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={data.data || []}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" /><YAxis /><Tooltip /><Legend /><Line type="monotone" dataKey="orders" stroke="#1890ff" name="Заказы" strokeWidth={2} /><Line type="monotone" dataKey="revenue" stroke="#52c41a" name="Выручка" strokeWidth={2} /></LineChart>
-      </ResponsiveContainer>
-    </Card>
+    <div>
+      <Row gutter={[16, 16]}>
+        <Col span={8}><Card><Statistic title="Выдано заказов" value={data.total_issued ?? 0} valueStyle={{ color: '#1890ff' }} /></Card></Col>
+        <Col span={8}><Card><Statistic title="Средний срок ремонта" value={data.avg_repair_days ?? 0} suffix="дней" valueStyle={{ color: '#52c41a' }} /></Col>
+        <Col span={8}><Card><Statistic title="Средний срок (часы)" value={data.avg_repair_hours ?? 0} suffix="ч" precision={1} valueStyle={{ color: '#722ed1' }} /></Card></Col>
+      </Row>
+      {(data.masters_avg?.length ?? 0) > 0 && (
+        <Card title="Средний срок по мастерам" style={{ marginTop: 16 }} size="small">
+          <Table dataSource={data.masters_avg} rowKey="master_id" pagination={false} columns={[
+            { title: 'Мастер', dataIndex: 'master_name', key: 'master' },
+            { title: 'Заказов', dataIndex: 'orders', key: 'orders' },
+            { title: 'Средний срок', dataIndex: 'avg_days', key: 'avg', render: (v: number) => `${v} дн.` },
+          ]} />
+        </Card>
+      )}
+      <Card title={`Динамика (${data.period})`} style={{ marginTop: 16 }}>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={data.data || []}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" /><YAxis /><Tooltip /><Legend /><Line type="monotone" dataKey="orders" stroke="#1890ff" name="Заказы" strokeWidth={2} /><Line type="monotone" dataKey="revenue" stroke="#52c41a" name="Выручка" strokeWidth={2} /></LineChart>
+        </ResponsiveContainer>
+      </Card>
+    </div>
   )
 }
 
