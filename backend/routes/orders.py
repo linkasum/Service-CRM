@@ -294,7 +294,26 @@ def get_orders(
         if current_user.role and current_user.role.name == 'master':
             query = query.where(Order.master_id == current_user.id)
 
-        count_query = select(func.count(Order.id)).select_from(query.subquery())
+        count_query = select(func.count(Order.id))
+        if date_from:
+            count_query = count_query.where(Order.created_at >= datetime.fromisoformat(date_from))
+        if date_to:
+            count_query = count_query.where(Order.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+        if status_filter:
+            count_query = count_query.where(Order.status == status_filter)
+        if master_id:
+            count_query = count_query.where(Order.master_id == master_id)
+        if client_phone:
+            count_query = count_query.where(Order.client_phone == client_phone)
+        if search:
+            count_query = count_query.where(
+                (Order.client_name.ilike(f"%{search}%")) |
+                (Order.client_phone.ilike(f"%{search}%")) |
+                (Order.device_model.ilike(f"%{search}%")) |
+                (Order.device_brand.ilike(f"%{search}%"))
+            )
+        if current_user.role and current_user.role.name == 'master':
+            count_query = count_query.where(Order.master_id == current_user.id)
         total = session.exec(count_query).one()
 
         # Считаем количество по статусам (без пагинации и status_filter)
