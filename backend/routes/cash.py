@@ -197,7 +197,6 @@ def close_shift(
                     select(SalaryRecord).where(
                         SalaryRecord.order_id == t.order_id,
                         SalaryRecord.status == 'accrued',
-                        SalaryRecord.comment.contains(str(t.id)),
                     )
                 ).first()
                 if not existing:
@@ -214,12 +213,10 @@ def close_shift(
         elif t.transaction_type == TransactionType.expense and t.order_id and t.amount < 0:
             order = session.get(Order, t.order_id)
             if order and order.master_id:
-                comment_match = f'Запчасти: #{t.order_id}'
                 existing = session.exec(
                     select(SalaryRecord).where(
                         SalaryRecord.order_id == t.order_id,
                         SalaryRecord.status == 'deducted',
-                        SalaryRecord.comment == comment_match,
                     )
                 ).first()
                 if not existing:
