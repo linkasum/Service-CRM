@@ -15,7 +15,10 @@ class PartBase(BaseModel):
 
 
 class PartCreate(PartBase):
-    pass
+    paid_from_cash: bool = Field(
+        default=True,
+        description="Закупка оплачена наличными из кассы (создаётся расходная транзакция)"
+    )
 
 
 class PartUpdate(BaseModel):
@@ -41,6 +44,10 @@ class PartMovement(BaseModel):
     quantity: int = Field(..., gt=0)
     order_id: Optional[int] = None  # Для списания в заказ
     master_id: Optional[int] = None  # Мастер, с которого списывается запчасть
+    paid_from_cash: bool = Field(
+        default=True,
+        description="Для прихода: закупка оплачена наличными из кассы"
+    )
 
 
 class WriteOffRead(BaseModel):
