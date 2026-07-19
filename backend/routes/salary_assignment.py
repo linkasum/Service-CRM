@@ -85,12 +85,15 @@ def auto_assign_salary(
     total_cost = order.total_cost or 0
     parts_cost = order.parts_cost or 0
     
-    # Считаем cash_net/card_net для заказа из реальных транзакций
-    from models.cash_transaction import CashTransaction
+    # Считаем cash_net/card_net для заказа из реальных транзакций (только доходы)
+    from models.cash_transaction import CashTransaction, TransactionType as CTType
     cash_net = 0.0
     card_net = 0.0
     txs = session.exec(
-        select(CashTransaction).where(CashTransaction.order_id == order_id)
+        select(CashTransaction).where(
+            CashTransaction.order_id == order_id,
+            CashTransaction.transaction_type == CTType.income,
+        )
     ).all()
     for tx in txs:
         amt = tx.amount or 0
