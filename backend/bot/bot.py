@@ -198,7 +198,6 @@ def main_keyboard(user: dict) -> ReplyKeyboardMarkup:
         rows.append(third_row)
 
     if user["role"] == "master":
-        query = query.where(Order.master_id == user["id"])
         rows.append([KeyboardButton(text="💰 Зарплата")])
 
     fourth_row = []
@@ -1143,13 +1142,8 @@ async def salary_cmd(message: types.Message):
         await message.answer("Вы не авторизованы")
         return
     now = datetime.now()
-    period_start = datetime(now.year, now.month, 1) if now.day <= 15 else datetime(now.year, now.month, 16)
-    if now.day <= 15:
-        period_end = datetime(now.year, now.month, 15, 23, 59, 59)
-    elif now.month < 12:
-        period_end = datetime(now.year, now.month + 1, 1) - timedelta(seconds=1)
-    else:
-        period_end = datetime(now.year + 1, 1, 1) - timedelta(seconds=1)
+    period_start = datetime(now.year, now.month, 1)
+    period_end = datetime(now.year, now.month + 1, 1) - timedelta(seconds=1) if now.month < 12 else datetime(now.year + 1, 1, 1) - timedelta(seconds=1)
     with Session(engine) as session:
         records = session.exec(
             select(SalaryRecord).where(
