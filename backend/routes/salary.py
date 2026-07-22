@@ -2,7 +2,7 @@
 Маршруты: Зарплаты — формулы и фиксированные суммы
 """
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlmodel import Session, select, func
 from datetime import datetime, time
 
@@ -448,8 +448,8 @@ def employee_salary_detail(
 @router.post("/records/{user_id}/pay", summary="Выплатить зарплату сотруднику")
 def pay_salary(
     user_id: int,
-    amount: float,
-    comment: Optional[str] = None,
+    amount: float = Body(...),
+    comment: Optional[str] = Body(None),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):

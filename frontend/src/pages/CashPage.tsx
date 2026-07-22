@@ -33,6 +33,7 @@ const CashPage: React.FC = () => {
   const [txType, setTxType] = useState('income')
   const [transactions, setTransactions] = useState<any[]>([])
   const [readyOrders, setReadyOrders] = useState<any[]>([])
+  const [masters, setMasters] = useState<any[]>([])
   const [shiftHistory, setShiftHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -57,6 +58,10 @@ const CashPage: React.FC = () => {
     loadShift()
     loadReadyOrders()
     loadMonthlySummary()
+    api.get('/users').then(r => {
+      const items = r.data.items || r.data
+      setMasters(items.filter((u: any) => u.role_name === 'master' || u.role_name === 'admin'))
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -180,14 +185,22 @@ const CashPage: React.FC = () => {
   const handleTransaction = async () => {
     const values = await txForm.validateFields()
     try {
-      await api.post('/cash/transaction', {
-        transaction_type: txType,
-        amount: values.amount,
-        order_id: values.order_id,
-        comment: values.comment,
-        is_parts: values.is_parts || false,
-      })
-      message.success(`${TX_TYPES[txType].label} проведён`)
+      if (txType === 'expense' && values.expense_type === 'salary') {
+        await api.post(`/salary/records/${values.master_id}/pay`, {
+          amount: values.amount,
+          comment: values.comment || 'Выплата ЗП',
+        })
+        message.success('ЗП выплачена')
+      } else {
+        await api.post('/cash/transaction', {
+          transaction_type: txType,
+          amount: values.amount,
+          order_id: values.order_id,
+          comment: values.comment,
+          is_parts: values.is_parts || false,
+        })
+        message.success(`${TX_TYPES[txType].label} проведён`)
+      }
       setTxModal(false)
       txForm.resetFields()
       loadShift()
@@ -552,27 +565,43 @@ const CashPage: React.FC = () => {
           )}
           {txType === 'expense' && (
             <>
-              <Form.Item name="is_parts" valuePropName="checked">
-                <Checkbox onChange={(e) => { if (!e.target.checked) txForm.setFieldValue('order_id', undefined) }}>
-                  Запчасти для мастера (вычет из ЗП 40%)
-                </Checkbox>
+              <Form.Item name="expense_type" initialValue="general">
+                <Select
+                  options={[
+                    {value: 'general', label: '💸 Хоз. расход'},
+                    {value: 'parts', label: '🔧 Запчасти для мастера (вычет 40%)'},
+                    {value: 'salary', label: '💰 Выплата ЗП мастеру'},
+                  ]}
+                  onChange={(val) => {
+                    if (val !== 'parts') txForm.setFieldValue('order_id', undefined)
+                    if (val === 'salary') txForm.setFieldValue('is_parts', false)
+                  }}
+                />
               </Form.Item>
-              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.is_parts !== cur.is_parts}>
-                {({ getFieldValue }) => getFieldValue('is_parts') ? (
-                  <Form.Item label="Заказ и мастер" name="order_id">
-                    <Select
-                      showSearch
-                      placeholder="Выберите заказ"
-                      filterOption={false}
-                      onSearch={searchOrders}
-                      allowClear
-                      options={orderList.map((o: any) => ({
-                        value: o.id,
-                        label: `#${o.id} ${o.client_name || ''} — ${o.device_model || ''} (${o.master_username || 'без мастера'})`
-                      }))}
-                    />
-                  </Form.Item>
-                ) : null}
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.expense_type !== cur.expense_type}>
+                {({ getFieldValue }) => {
+                  const et = getFieldValue('expense_type')
+                  if (et === 'parts') return (
+                    <>
+                      <Form.Item name="is_parts" valuePropName="checked" initialValue={true}>
+                        <Checkbox defaultChecked>Запчасти для мастера</Checkbox>
+                      </Form.Item>
+                      <Form.Item label="Заказ и мастер" name="order_id">
+                        <Select showSearch placeholder="Выберите заказ" filterOption={false} onSearch={searchOrders} allowClear
+                          options={orderList.map((o: any) => ({value: o.id, label: `#${o.id} ${o.client_name || ''} — ${o.device_model || ''} (${o.master_username || 'без мастера'})`}))}
+                        />
+                      </Form.Item>
+                    </>
+                  )
+                  if (et === 'salary') return (
+                    <Form.Item label="Мастер" name="master_id" rules={[{required: true, message: 'Выберите мастера'}]}>
+                      <Select placeholder="Выберите мастера"
+                        options={masters.map((m: any) => ({value: m.id, label: m.full_name || m.username}))}
+                      />
+                    </Form.Item>
+                  )
+                  return null
+                }}
               </Form.Item>
             </>
           )}
