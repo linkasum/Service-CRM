@@ -314,12 +314,22 @@ def orders_query_for_user(user: dict):
     return query.order_by(Order.created_at.desc())
 
 
-def orders_list_keyboard(orders: list[Order], back_callback: str = "menu") -> InlineKeyboardMarkup:
+PAGE_SIZE = 8
+
+def orders_list_keyboard(orders: list[Order], page: int = 0, total: int = 0, back_callback: str = "menu") -> InlineKeyboardMarkup:
     rows = []
-    for order in orders[:15]:
+    start = page * PAGE_SIZE
+    for order in orders[start : start + PAGE_SIZE]:
         text = f"#{order.id} {status_label(order.status)} - {order.device_model[:24]}"
         rows.append([InlineKeyboardButton(text=text, callback_data=f"order:{order.id}")])
-    rows.append([InlineKeyboardButton(text="Назад", callback_data=back_callback)])
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="◀ Назад", callback_data=f"orders_p:{page - 1}"))
+    if total > start + PAGE_SIZE:
+        nav.append(InlineKeyboardButton(text="Вперёд ▶", callback_data=f"orders_p:{page + 1}"))
+    if nav:
+        rows.append(nav)
+    rows.append([InlineKeyboardButton(text="🔍 Поиск", callback_data="orders_search"), InlineKeyboardButton(text="Меню", callback_data=back_callback)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -418,13 +428,14 @@ def format_order(order: Order, comments: list[OrderComment] | None = None) -> st
     return "\n".join(lines)
 
 
-async def send_orders(message: types.Message, user: dict, title: str) -> None:
+async def send_orders(message: types.Message, user: dict, title: str, page: int = 0) -> None:
     with Session(engine) as session:
-        orders = session.exec(orders_query_for_user(user)).all()[:15]
+        orders = session.exec(orders_query_for_user(user)).all()
+    total = len(orders)
     if not orders:
         await message.answer("Активных заказов нет")
         return
-    await message.answer(title, reply_markup=orders_list_keyboard(orders))
+    await message.answer(title, reply_markup=orders_list_keyboard(orders, page, total))
 
 
 async def send_menu(message: types.Message, user: dict) -> None:
@@ -561,12 +572,53 @@ async def orders_callback(callback: CallbackQuery):
         await callback.answer()
         return
     with Session(engine) as session:
-        orders = session.exec(orders_query_for_user(user)).all()[:15]
+        orders = session.exec(orders_query_for_user(user)).all()
     if not orders:
         await callback.message.edit_text("Активных заказов нет")
     else:
-        await callback.message.edit_text("Активные заказы:", reply_markup=orders_list_keyboard(orders))
+        await callback.message.edit_text("Активные заказы:", reply_markup=orders_list_keyboard(orders, 0, len(orders)))
     await callback.answer()
+
+
+@dp.callback_query(lambda callback: callback.data and callback.data.startswith("orders_p:"))
+async def orders_page_callback(callback: CallbackQuery):
+    user = get_user(callback.from_user.id)
+    if not user or not callback.message:
+        await callback.answer()
+        return
+    page = int(callback.data.split(":")[1])
+    with Session(engine) as session:
+        orders = session.exec(orders_query_for_user(user)).all()
+    await callback.message.edit_text("Активные заказы:", reply_markup=orders_list_keyboard(orders, page, len(orders)))
+    await callback.answer()
+
+
+@dp.callback_query(lambda callback: callback.data == "orders_search")
+async def orders_search_callback(callback: CallbackQuery):
+    user = get_user(callback.from_user.id)
+    if not user or not callback.message:
+        await callback.answer()
+    await callback.message.edit_text("Введите номер заказа или имя клиента:", reply_markup=InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="Отмена", callback_data="orders")]]
+    ))
+    await callback.answer()
+
+
+@dp.message(lambda message: message.text and message.text.isdigit() and len(message.text) <= 6)
+async def orders_search_by_id(message: types.Message):
+    user = require_auth(message)
+    if not user:
+        return
+    order_id = int(message.text)
+    with Session(engine) as session:
+        query = select(Order).where(Order.id == order_id)
+        if user["role"] == "master":
+            query = query.where(Order.master_id == user["id"])
+        order = session.exec(query).first()
+    if not order:
+        await message.answer(f"Заказ #{message.text} не найден")
+        return
+    await message.answer(format_order(order), reply_markup=order_menu_keyboard(order.id, user))
 
 
 @dp.callback_query(lambda callback: callback.data and callback.data.startswith("order:"))
