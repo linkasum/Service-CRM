@@ -58,7 +58,7 @@ const CashPage: React.FC = () => {
     loadShift()
     loadReadyOrders()
     loadMonthlySummary()
-    api.get('/users').then(r => {
+    api.get('/users/').then(r => {
       const items = r.data.items || r.data
       setMasters(items.filter((u: any) => u.role_name === 'master' || u.role_name === 'admin'))
     }).catch(() => {})
