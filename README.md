@@ -19,6 +19,32 @@ CRM для управления сервисным центром по ремо�
 - Печать документов: акт выполненных работ, квитанция, счёт, акт диагностики
 - Системные комментарии и история
 
+### Мобильный клиент (PWA)
+- Адаптивный веб-интерфейс для мастеров и курьеров
+- Установка на домашний экран (Android/iOS)
+- Просмотр заказов с фильтрацией: Мои / В работе / Готов / Все
+- Смена статусов, комментарии, отметка доставки
+- Авторизация только для ролей master и admin
+- Тёмная/светлая тема
+- Статусы и цвета подтягиваются из базы
+- Размещён на `onservis.cc/mobile/`
+
+### Архитектура деплоя
+```
+Телефон → Cloudflare (HTTPS) → VPS (cloudflared → nginx :8080)
+                                       ├── /mobile/ → статика PWA
+                                       └── /api/ → MikroTik :58294 → CRM :8000
+```
+- **Сервер CRM**: локальная сеть (10.20.4.199), не доступен из интернета
+- **VPS**: 94.156.116.13 (onservis.cc), nginx + cloudflared
+- **MikroTik**: проброс порта 58294 → 10.20.4.199:8000
+- **TrustTunnel**: клиент на CRM-сервере для исходящего трафика (Telegram бот)
+
+### Защита от брутфорса
+- **Fail2ban**: после 5 ошибок 401 на `/api/auth/login` → бан IP на 1 час
+- **Уведомления в Telegram**: при бане/разбане
+- **Nginx rate limit**: запасной контур (настраивается при необходимости)
+
 ### Зарплата
 - Формула: `({cash_net} + {card_net}) × 0.4` — 40% от чистого дохода мастера
 - Поддержка переменных: `{cash_net}`, `{card_net}`, `{payments_net}`, `{total_cost}`, `{parts_cost}`
@@ -59,12 +85,15 @@ CRM для управления сервисным центром по ремо�
 | Слой | Технология |
 |------|-----------|
 | **Бэкенд** | Python 3.11, FastAPI, SQLModel, SQLAlchemy |
-| **База данных** | PostgreSQL 15 |
+| **База данных** | PostgreSQL 16 |
 | **Фронтенд** | React 18, TypeScript, Ant Design, Vite |
+| **Мобильный клиент** | React 19, TypeScript, Vite, PWA |
 | **Контейнеризация** | Docker Compose |
 | **Бэкапы** | Samba (NAS), cron |
 | **Печать** | HTML → PDF (браузерная) |
 | **QR-коды** | qrcode, СБП (Система Быстрых Платежей) |
+| **Туннели** | TrustTunnel, Cloudflare Tunnel |
+| **Безопасность** | Fail2ban, Nginx rate limit |
 
 ## Установка
 
@@ -76,8 +105,8 @@ CRM для управления сервисным центром по ремо�
 
 ```bash
 # Клонировать репозиторий
-git clone <repo-url>
-cd qwencrm
+git clone https://github.com/linkasum/Service-CRM.git
+cd Service-CRM
 
 # Создать пустую базу
 psql -U postgres -c "CREATE DATABASE qwencrm"
@@ -87,6 +116,15 @@ docker compose -f docker-compose.dev.yml --profile bot up -d
 
 # Применить миграции
 docker compose -f docker-compose.dev.yml --profile bot exec backend alembic upgrade head
+```
+
+### Мобильный клиент (разработка)
+
+```bash
+cd mobile
+npm install
+npm run dev        # Dev-сервер с HTTPS и прокси к API
+npm run build      # Production-сборка в dist/
 ```
 
 ### Инициализация пустой базы
@@ -148,7 +186,7 @@ bash backup_db.sh
 ## Структура проекта
 
 ```
-qwencrm/
+Service-CRM/
 ├── backend/
 │   ├── routes/
 │   │   ├── salary.py           # Расчёт ЗП
@@ -166,6 +204,13 @@ qwencrm/
 │   │   ├── pages/              # Страницы
 │   │   ├── components/         # Компоненты
 │   │   └── api.ts              # API-клиент
+│   └── ...
+├── mobile/                     # Мобильный PWA-клиент
+│   ├── src/
+│   │   ├── api/                # API-клиент (auth, orders, statuses)
+│   │   ├── pages/              # Login, Orders, OrderDetail
+│   │   ├── hooks/              # useAuth, useTheme
+│   │   └── components/         # ProtectedRoute
 │   └── ...
 ├── docker-compose.dev.yml
 ├── docker-compose.yml
