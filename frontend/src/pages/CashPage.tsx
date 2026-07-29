@@ -33,7 +33,7 @@ const CashPage: React.FC = () => {
   const [txType, setTxType] = useState('income')
   const [transactions, setTransactions] = useState<any[]>([])
   const [readyOrders, setReadyOrders] = useState<any[]>([])
-  const [masters, setMasters] = useState<any[]>([])
+  const [employees, setEmployees] = useState<any[]>([])
   const [shiftHistory, setShiftHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -60,7 +60,7 @@ const CashPage: React.FC = () => {
     loadMonthlySummary()
     api.get('/users/').then(r => {
       const items = r.data.items || r.data
-      setMasters(items.filter((u: any) => u.role_name === 'master' || u.role_name === 'admin'))
+      setEmployees(items)
     }).catch(() => {})
   }, [])
 
@@ -570,7 +570,7 @@ const CashPage: React.FC = () => {
                   options={[
                     {value: 'general', label: '💸 Хоз. расход'},
                     {value: 'parts', label: '🔧 Запчасти для мастера (вычет 40%)'},
-                    {value: 'salary', label: '💰 Выплата ЗП мастеру'},
+                    {value: 'salary', label: '💰 Выплата ЗП сотруднику'},
                   ]}
                   onChange={(val) => {
                     if (val !== 'parts') txForm.setFieldValue('order_id', undefined)
@@ -594,9 +594,9 @@ const CashPage: React.FC = () => {
                     </>
                   )
                   if (et === 'salary') return (
-                    <Form.Item label="Мастер" name="master_id" rules={[{required: true, message: 'Выберите мастера'}]}>
-                      <Select placeholder="Выберите мастера"
-                        options={masters.map((m: any) => ({value: m.id, label: m.full_name || m.username}))}
+                    <Form.Item label="Сотрудник" name="master_id" rules={[{required: true, message: 'Выберите сотрудника'}]}>
+                      <Select placeholder="Выберите сотрудника"
+                        options={employees.map((m: any) => ({value: m.id, label: m.full_name || m.username}))}
                       />
                     </Form.Item>
                   )

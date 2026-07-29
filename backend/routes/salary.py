@@ -462,36 +462,6 @@ def pay_salary(
     if not user:
         raise HTTPException(status_code=404, detail="Сотрудник не найден")
     
-    # Проверяем баланс (начисления - удержания - выплаты)
-    accrued = session.exec(
-        select(func.sum(SalaryRecord.calculated_amount)).where(
-            SalaryRecord.user_id == user_id,
-            SalaryRecord.status == 'accrued'
-        )
-    ).first() or 0
-    
-    deducted = session.exec(
-        select(func.sum(SalaryRecord.calculated_amount)).where(
-            SalaryRecord.user_id == user_id,
-            SalaryRecord.status == 'deducted'
-        )
-    ).first() or 0
-    
-    paid = session.exec(
-        select(func.sum(SalaryRecord.calculated_amount)).where(
-            SalaryRecord.user_id == user_id,
-            SalaryRecord.status == 'paid'
-        )
-    ).first() or 0
-    
-    balance = accrued + deducted + paid  # deducted и paid отрицательные
-    
-    if amount > balance:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Недостаточно средств для выплаты. Баланс: {balance:.2f}₽, Запрошено: {amount:.2f}₽"
-        )
-    
     # Создаём запись о выплате
     record = SalaryRecord(
         user_id=user_id,
@@ -527,14 +497,12 @@ def pay_salary(
     
     session.commit()
     
-    logger.info(f"Выплачена зарплата {amount}₽ сотруднику {user.username} (баланс был: {balance:.2f}₽)")
-    
+    logger.info(f"Выплачена зарплата {amount}₽ сотруднику {user.username}")
+
     return {
         "message": f"Выплачено {amount}₽",
         "user_id": user_id,
         "username": user.username,
-        "balance_before": round(balance, 2),
-        "balance_after": round(balance - amount, 2),
         "record_id": record.id,
         "cash_transaction_id": cash_transaction.id,
     }
