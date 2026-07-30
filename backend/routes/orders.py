@@ -21,6 +21,7 @@ from models.cash_shift import CashShift
 from models.user import User
 from models.role import Role
 from models.notification_task import NotificationTask
+from models.custom_status import CustomStatus
 from schemas.order import OrderCreate, OrderUpdate, OrderRead, OrderStatusChange
 from core.logging import logger
 from core.websocket_manager import ws_manager
@@ -29,18 +30,38 @@ from routes.clients import get_or_create_client
 router = APIRouter(prefix="/api/orders", tags=["Заказы"])
 
 
-STATUS_LABELS = {
-    "new": "Новый",
-    "diagnostics": "Диагностика",
-    "agreed": "Согласован",
-    "repair": "В работе",
-    "waiting_parts": "Ожидает запчасти",
-    "ready": "Готов",
-    "ready_pickup": "На выдаче",
-    "issued": "Выдан",
-    "issued_br": "Выдан БР",
-    "cancelled": "Отменён",
-}
+_STATUS_LABELS_CACHE: dict[str, str] = {}
+_STATUS_LIST_CACHE: list[dict] = []
+
+
+def get_status_labels(session: Session) -> dict[str, str]:
+    global _STATUS_LABELS_CACHE
+    if not _STATUS_LABELS_CACHE:
+        statuses = session.exec(
+            select(CustomStatus).where(CustomStatus.is_active == True).order_by(CustomStatus.id)
+        ).all()
+        _STATUS_LABELS_CACHE = {s.code: s.name for s in statuses if s.code}
+    return _STATUS_LABELS_CACHE
+
+
+def invalidate_status_cache():
+    global _STATUS_LABELS_CACHE, _STATUS_LIST_CACHE
+    _STATUS_LABELS_CACHE = {}
+    _STATUS_LIST_CACHE = []
+
+
+@router.get("/statuses", summary="Список статусов заказов")
+def list_statuses(session: Session = Depends(get_session)):
+    global _STATUS_LIST_CACHE
+    if not _STATUS_LIST_CACHE:
+        statuses = session.exec(
+            select(CustomStatus).where(CustomStatus.is_active == True).order_by(CustomStatus.id)
+        ).all()
+        _STATUS_LIST_CACHE = [
+            {"code": s.code, "name": s.name, "color": s.color}
+            for s in statuses if s.code
+        ]
+    return _STATUS_LIST_CACHE
 
 
 def _telegram_proxy_url() -> Optional[str]:
@@ -86,7 +107,7 @@ async def _notify_master_status_change(
             master.telegram_chat_id,
             "Статус вашего заказа изменен\n"
             f"Заказ #{order.id}: {order.device_model}\n"
-            f"{STATUS_LABELS.get(old_status, old_status)} -> {STATUS_LABELS.get(new_status, new_status)}\n"
+            f"{get_status_labels(session).get(old_status, old_status)} -> {get_status_labels(session).get(new_status, new_status)}\n"
             f"Изменил: {current_user.full_name or current_user.username}",
         )
     except Exception as exc:
@@ -104,7 +125,7 @@ async def _notify_client_order(session: Session, order: Order, event: str = "cre
         text = (
             f"Создан новый заказ #{order.id}\n"
             f"Устройство: {device}\n"
-            f"Статус: {STATUS_LABELS.get(order.status, order.status)}"
+            f"Статус: {get_status_labels(session).get(order.status, order.status)}"
         )
     elif event == "ready_pickup":
         text = (
@@ -116,7 +137,7 @@ async def _notify_client_order(session: Session, order: Order, event: str = "cre
         text = (
             f"Статус заказа #{order.id} изменен\n"
             f"Устройство: {device}\n"
-            f"Новый статус: {STATUS_LABELS.get(order.status, order.status)}"
+            f"Новый статус: {get_status_labels(session).get(order.status, order.status)}"
         )
     else:
         return
@@ -596,7 +617,7 @@ async def change_status(
             user_id=current_user.id,
             username=current_user.username,
             role_name=current_user.role.name if current_user.role else "",
-            text=f"Статус изменён: {STATUS_LABELS.get(old_status, old_status)} → {STATUS_LABELS.get(order.status, order.status)}",
+            text=f"Статус изменён: {get_status_labels(session).get(old_status, old_status)} → {get_status_labels(session).get(order.status, order.status)}",
             is_system=True,
         )
         session.add(sys_comment)
@@ -631,7 +652,7 @@ async def change_status(
             from routes.notifications import add_notification
             add_notification(session, current_user.id, current_user.username,
                 "order_status_changed",
-                f"Заказ #{order.id}: {STATUS_LABELS.get(old_status, old_status)} -> {STATUS_LABELS.get(order.status, order.status)}",
+                f"Заказ #{order.id}: {get_status_labels(session).get(old_status, old_status)} -> {get_status_labels(session).get(order.status, order.status)}",
                 order.id)
         except Exception:
             pass

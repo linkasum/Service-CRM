@@ -30,7 +30,7 @@ commentsApi.interceptors.request.use(c => {
 const DEFAULT_STATUSES = [
   { value: 'new', label: 'Новый', color: '#e6f7ff', border: '#1890ff' },
   { value: 'diagnostics', label: 'Диагностика', color: '#fffbe6', border: '#faad14' },
-  { value: 'agreed', label: 'Согласован', color: '#fff7e6', border: '#fa8c16' },
+  { value: 'agreed', label: 'Согласование', color: '#fff7e6', border: '#fa8c16' },
   { value: 'repair', label: 'В работе', color: '#f9f0ff', border: '#722ed1' },
   { value: 'waiting_parts', label: 'Ожидает запчасти', color: '#e6fffb', border: '#13c2c2' },
   { value: 'ready', label: 'Готов', color: '#f6ffed', border: '#52c41a' },

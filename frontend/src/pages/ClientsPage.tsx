@@ -1,17 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Table, Input, Drawer, Descriptions, message, Tag, Spin } from 'antd'
 import { EyeOutlined, SearchOutlined } from '@ant-design/icons'
-import { getClients, getClient } from '../api'
-
-const statusLabels: Record<string, string> = {
-  new: 'Новый',
-  diagnostics: 'Диагностика',
-  agreed: 'Согласован',
-  repair: 'В ремонте',
-  ready: 'Готов',
-  issued: 'Выдан',
-  cancelled: 'Отменён',
-}
+import { getClients, getClient, getOrderStatuses } from '../api'
 
 const clientTypeLabels: Record<string, string> = {
   individual: 'Физ. лицо',
@@ -23,6 +13,7 @@ const ClientsPage: React.FC = () => {
   const [clients, setClients] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [statusLabels, setStatusLabels] = useState<Record<string, string>>({})
   const [drawerVisible, setDrawerVisible] = useState(false)
   const [selectedClient, setSelectedClient] = useState<any>(null)
   const [drawerLoading, setDrawerLoading] = useState(false)
@@ -33,6 +24,14 @@ const ClientsPage: React.FC = () => {
   useEffect(() => {
     fetchClients()
   }, [page, searchText])
+
+  useEffect(() => {
+    getOrderStatuses().then((data: any[]) => {
+      const map: Record<string, string> = {}
+      data.forEach((s: any) => { if (s.code) map[s.code] = s.name })
+      setStatusLabels(map)
+    }).catch(() => {})
+  }, [])
 
   const fetchClients = async () => {
     setLoading(true)

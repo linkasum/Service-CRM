@@ -237,7 +237,7 @@ export interface ApiError {
 export const ORDER_STATUS_CONFIG: Record<OrderStatus, { label: string; color: string }> = {
   new: { label: 'Новый', color: 'blue' },
   diagnostics: { label: 'Диагностика', color: 'gold' },
-  agreed: { label: 'Согласован', color: 'orange' },
+  agreed: { label: 'Согласование', color: 'orange' },
   repair: { label: 'В ремонте', color: 'purple' },
   ready: { label: 'Готов', color: 'green' },
   issued: { label: 'Выдан', color: 'default' },
