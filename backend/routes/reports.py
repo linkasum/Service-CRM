@@ -110,7 +110,7 @@ def financial_report(
     date_from_dt, date_to_dt = _parse_date_range(date_from, date_to)
 
     # Заказы
-    query = select(Order).where(Order.status == "issued")
+    query = select(Order)
     if date_from_dt:
         query = query.where(Order.created_at >= date_from_dt)
     if date_to_dt:
@@ -125,10 +125,10 @@ def financial_report(
         tx_query = tx_query.where(CashTransaction.created_at <= date_to_dt)
     transactions = session.exec(tx_query).all()
 
-    cash_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.cash)
-    card_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.card)
+    cash_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.cash and t.order_id is not None)
+    card_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.card and t.order_id is not None)
 
-    # Расходы: запчасти (с order_id) отдельно от ЗП (без order_id)
+    # Расходы: запчасти (с order_id) отдельно от хозяйственных (без order_id)
     parts_cash = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.cash and t.order_id is not None)
     parts_card = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.card and t.order_id is not None)
     other_cash = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.cash and t.order_id is None)
@@ -154,7 +154,9 @@ def financial_report(
         name = (user.full_name or user.username) if user else f"ID {r.user_id}"
         salary_by_user[name] += abs(r.calculated_amount)
 
-    total_revenue = sum(o.total_cost or 0 for o in orders)
+    # Выручка с заказов = все приходы минус возвраты
+    total_refund = sum(abs(t.amount) for t in transactions if t.transaction_type != TransactionType.income and t.comment and 'возврат' in (t.comment or '').lower())
+    total_revenue = total_income - total_refund
     total_parts_cost = sum(o.parts_cost or 0 for o in orders)
 
     # Прибыль = доходы - расходы (ЗП уже в расходах)
@@ -174,9 +176,10 @@ def financial_report(
     for r in salary_records:
         day = r.created_at.strftime("%Y-%m-%d")
         by_day[day]["salary"] += abs(r.calculated_amount)
-    for o in orders:
-        day = o.created_at.strftime("%Y-%m-%d")
-        by_day[day]["revenue"] += o.total_cost or 0
+    for t in transactions:
+        if t.transaction_type == TransactionType.income and t.order_id is not None:
+            day = t.created_at.strftime("%Y-%m-%d")
+            by_day[day]["revenue"] += t.amount
 
     # По мастерам
     master_revenue = defaultdict(lambda: {"orders": 0, "revenue": 0.0, "parts": 0.0})
@@ -463,27 +466,19 @@ def dashboard_summary(
     orders = session.exec(query).all()
     total = len(orders)
 
+    # Доход — income-транзакции по заказам за период (как в кассе)
+    tx_query = select(CashTransaction).where(CashTransaction.order_id.isnot(None))
+    if date_from_dt:
+        tx_query = tx_query.where(CashTransaction.created_at >= date_from_dt)
+    if date_to_dt:
+        tx_query = tx_query.where(CashTransaction.created_at <= date_to_dt)
+    order_transactions = session.exec(tx_query).all()
+
+    income_sum = sum(t.amount for t in order_transactions if t.transaction_type == TransactionType.income)
+    refund_sum = sum(abs(t.amount) for t in order_transactions if t.transaction_type != TransactionType.income and t.comment and 'возврат' in (t.comment or '').lower())
+    revenue = income_sum - refund_sum
+
     issued_orders = [o for o in orders if o.status == "issued"]
-    # Считаем реальный приход по транзакциям (только доходы, без расходов на запчасти)
-    revenue = 0.0
-    if issued_orders:
-        oids = [o.id for o in issued_orders]
-        from models.cash_transaction import CashTransaction, TransactionType as CTType
-        income_sum = session.exec(
-            select(func.sum(CashTransaction.amount)).where(
-                CashTransaction.order_id.in_(oids),
-                CashTransaction.transaction_type == CTType.income
-            )
-        ).first()
-        # Вычитаем только возвраты (expense с комментарием "возврат")
-        refund_sum = session.exec(
-            select(func.sum(CashTransaction.amount)).where(
-                CashTransaction.order_id.in_(oids),
-                CashTransaction.transaction_type != CTType.income,
-                CashTransaction.comment.ilike('%возврат%')
-            )
-        ).first()
-        revenue = (income_sum or 0) + (refund_sum or 0)
 
     # Статусы
     by_status = defaultdict(int)
@@ -519,16 +514,16 @@ def dashboard_summary(
     for o in orders:
         day = o.created_at.strftime("%Y-%m-%d")
         by_day_orders[day] += 1
-    for o in issued_orders:
-        day = o.created_at.strftime("%Y-%m-%d")
-        by_day_revenue[day] += o.total_cost or 0
+    for t in order_transactions:
+        if t.transaction_type == TransactionType.income:
+            day = t.created_at.strftime("%Y-%m-%d")
+            by_day_revenue[day] += t.amount
 
-    # Генерируем полный ряд дат в запрошенном диапазоне
+    # Генерируем полный ряд дат
     if date_from_dt and date_to_dt:
         start_date = date_from_dt
         end_date = date_to_dt
     else:
-        # По умолчанию — текущий месяц
         start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         end_date = now
 
@@ -544,15 +539,14 @@ def dashboard_summary(
 
     return {
         "total_orders": total,
-        "issued_orders": len(issued_orders),
         "total_revenue": round(revenue, 2),
+        "issued_orders": len(issued_orders),
         "avg_order_value": round(revenue / len(issued_orders), 2) if issued_orders else 0,
-        "by_status": dict(by_status),
-        "status_breakdown": dict(by_status),  # Алиас для DashboardPage
+        "active_masters": len([m for m in masters_data.values() if m["orders_completed"] > 0]),
+        "status_breakdown": dict(by_status),
+        "masters_efficiency": list(masters_data.values()),
         "overdue_orders": overdue,
         "warranty_orders": warranty_orders,
-        "masters_efficiency": list(masters_data.values()),  # Для DashboardPage
-        "active_masters": len(masters_data),
         "total_parts": total_parts,
         "parts_value": round(parts_value, 2),
         "daily_orders": daily_orders,

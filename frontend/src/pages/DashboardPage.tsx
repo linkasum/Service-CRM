@@ -23,9 +23,8 @@ import dayjs from 'dayjs'
 import { 
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell
 } from 'recharts'
-import { getDashboard } from '../api'
+import { getDashboard, getOrderStatuses } from '../api'
 import { useAuth } from '../contexts/AuthContext'
-import { ORDER_STATUS_CONFIG } from '../types'
 
 const { RangePicker } = DatePicker
 
@@ -38,8 +37,11 @@ const STATUS_COLORS: Record<string, string> = {
   diagnostics: '#faad14',
   agreed: '#fa8c16',
   repair: '#722ed1',
+  waiting_parts: '#13c2c2',
   ready: '#52c41a',
+  ready_pickup: '#eb2f96',
   issued: '#d9d9d9',
+  issued_br: '#8c8c8c',
   cancelled: '#f5222d',
 }
 
@@ -52,10 +54,19 @@ const DashboardPage: React.FC = () => {
     dayjs().startOf('month'),
     dayjs(),
   ])
+  const [statusLabels, setStatusLabels] = useState<Record<string, string>>({})
 
   useEffect(() => {
     fetchDashboard()
   }, [dateRange])
+
+  useEffect(() => {
+    getOrderStatuses().then((data: any[]) => {
+      const map: Record<string, string> = {}
+      data.forEach((s: any) => { if (s.code) map[s.code] = s.name })
+      setStatusLabels(map)
+    }).catch(() => {})
+  }, [])
 
   const fetchDashboard = async () => {
     setLoading(true)
@@ -199,7 +210,7 @@ const DashboardPage: React.FC = () => {
   // ===== Общий дашборд (Админ) =====
   const AdminDashboard = () => {
     const statusData = Object.entries(data.status_breakdown || {}).map(([status, count]) => ({
-      name: ORDER_STATUS_CONFIG[status]?.label || status,
+      name: statusLabels[status] || status,
       value: count,
       color: STATUS_COLORS[status] || '#d9d9d9',
     }))

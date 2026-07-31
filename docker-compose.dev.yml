@@ -38,7 +38,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: sh -c "python scripts/init_admin.py && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     environment:
       TZ: Europe/Moscow
       DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/qwencrm

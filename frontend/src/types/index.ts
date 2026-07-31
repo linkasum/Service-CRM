@@ -239,8 +239,11 @@ export const ORDER_STATUS_CONFIG: Record<OrderStatus, { label: string; color: st
   diagnostics: { label: 'Диагностика', color: 'gold' },
   agreed: { label: 'Согласование', color: 'orange' },
   repair: { label: 'В ремонте', color: 'purple' },
+  waiting_parts: { label: 'Ожидает запчасти', color: 'cyan' },
   ready: { label: 'Готов', color: 'green' },
+  ready_pickup: { label: 'На выдаче', color: 'magenta' },
   issued: { label: 'Выдан', color: 'default' },
+  issued_br: { label: 'Выдан БР', color: 'default' },
   cancelled: { label: 'Отменён', color: 'red' },
 }
 
