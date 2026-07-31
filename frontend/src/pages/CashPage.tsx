@@ -68,6 +68,9 @@ const CashPage: React.FC = () => {
     if (currentShift && !loading) {
       loadTransactions()
     }
+    if (activeTab === 'history') {
+      loadShiftHistory()
+    }
   }, [currentShift, activeTab])
 
   const loadShift = async () => {
