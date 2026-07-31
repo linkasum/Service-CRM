@@ -302,8 +302,7 @@ def employees_salary_report(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Список сотрудников с общей суммой начислений за период.
-    Возвращает: user_id, username, role, total_accrued, total_deductions, net_amount.
+    Список сотрудников с начислениями за период + входящий остаток.
     """
     # Получаем активных сотрудников с ролями
     query = select(User, Role).join(Role, User.role_id == Role.id).where(User.is_active == True)
@@ -311,46 +310,46 @@ def employees_salary_report(
     
     result = []
     for user, role in users:
-        # Пропускаем админов если нужно (можно настроить)
         if role.name.lower() in ['admin', 'administrator']:
             continue
-            
-        # Считаем начисления (accrued)
-        accrued_query = select(func.sum(SalaryRecord.calculated_amount)).where(
-            SalaryRecord.user_id == user.id,
-            SalaryRecord.status == 'accrued'
-        )
+        
+        # Входящий остаток: всё до date_from
+        opening = 0.0
         if date_from:
-            accrued_query = accrued_query.where(SalaryRecord.period_start >= date_from)
-        if date_to:
-            end_of_day = datetime.combine(date_to.date(), time.max)
-            accrued_query = accrued_query.where(SalaryRecord.period_start <= end_of_day)
+            for status_name in ('accrued', 'deducted', 'paid'):
+                q = select(func.sum(SalaryRecord.calculated_amount)).where(
+                    SalaryRecord.user_id == user.id,
+                    SalaryRecord.status == status_name,
+                    SalaryRecord.period_start < date_from
+                )
+                opening += session.exec(q).first() or 0
         
-        total_accrued = session.exec(accrued_query).first() or 0
+        # Начисления за период
+        def sum_by_status(status: str, from_dt, to_dt):
+            q = select(func.sum(SalaryRecord.calculated_amount)).where(
+                SalaryRecord.user_id == user.id,
+                SalaryRecord.status == status
+            )
+            if from_dt:
+                q = q.where(SalaryRecord.period_start >= from_dt)
+            if to_dt:
+                q = q.where(SalaryRecord.period_start <= datetime.combine(to_dt.date(), time.max))
+            return session.exec(q).first() or 0
         
-        # Считаем удержания (deducted)
-        deducted_query = select(func.sum(SalaryRecord.calculated_amount)).where(
-            SalaryRecord.user_id == user.id,
-            SalaryRecord.status == 'deducted'
-        )
-        if date_from:
-            deducted_query = deducted_query.where(SalaryRecord.period_start >= date_from)
-        if date_to:
-            end_of_day = datetime.combine(date_to.date(), time.max)
-            deducted_query = deducted_query.where(SalaryRecord.period_start <= end_of_day)
+        total_accrued = sum_by_status('accrued', date_from, date_to)
+        total_deducted = abs(sum_by_status('deducted', date_from, date_to))
+        total_paid = abs(sum_by_status('paid', date_from, date_to))
         
-        total_deducted = session.exec(deducted_query).first() or 0
-        # deducted обычно отрицательный, делаем положительным для отображения
-        total_deducted = abs(total_deducted) if total_deducted else 0
-        
-        net_amount = total_accrued - total_deducted
+        net_amount = opening + total_accrued - total_deducted - total_paid
         
         result.append({
             "user_id": user.id,
             "username": user.username,
             "role": role.name,
+            "opening_balance": round(opening, 2),
             "total_accrued": round(total_accrued, 2),
             "total_deductions": round(total_deducted, 2),
+            "total_paid": round(total_paid, 2),
             "net_amount": round(net_amount, 2),
             "orders_count": session.exec(
                 select(func.count(SalaryRecord.order_id.distinct())).where(
@@ -381,10 +380,8 @@ def employee_salary_detail(
     query = select(SalaryRecord).where(SalaryRecord.user_id == user_id).order_by(SalaryRecord.created_at.desc())
 
     if date_from:
-        # Включаем весь день с 00:00:00
         query = query.where(SalaryRecord.period_start >= date_from)
     if date_to:
-        # Включаем весь день до 23:59:59
         from datetime import time, timedelta
         end_of_day = datetime.combine(date_to.date(), time.max)
         query = query.where(SalaryRecord.period_start <= end_of_day)
@@ -430,6 +427,17 @@ def employee_salary_detail(
     # Считаем итоги
     total_accrued = sum(r.calculated_amount for r in records if r.status == 'accrued')
     total_deducted = sum(r.calculated_amount for r in records if r.status == 'deducted')
+    # Входящий остаток до date_from
+    opening = 0.0
+    if date_from:
+        for s in ('accrued', 'deducted', 'paid'):
+            q = select(func.sum(SalaryRecord.calculated_amount)).where(
+                SalaryRecord.user_id == user_id,
+                SalaryRecord.status == s,
+                SalaryRecord.period_start < date_from
+            )
+            opening += session.exec(q).first() or 0
+
     total_paid = sum(r.calculated_amount for r in records if r.status == 'paid')
 
     return {
@@ -437,10 +445,11 @@ def employee_salary_detail(
         "username": username,
         "records": result,
         "summary": {
+            "opening_balance": round(opening, 2),
             "total_accrued": round(total_accrued, 2),
             "total_deducted": round(total_deducted, 2),
             "total_paid": round(total_paid, 2),
-            "balance": round(total_accrued + total_deducted + total_paid, 2),  # К выплате (paid уже отриц.)
+            "balance": round(opening + total_accrued + total_deducted + total_paid, 2),
         }
     }
 

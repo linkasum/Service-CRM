@@ -343,7 +343,15 @@ const SalaryReport: React.FC = () => {
       render: (v: number) => <span style={{ color: '#f5222d', fontWeight: 600 }}>-{v.toFixed(2)} ₽</span>,
     },
     {
-      title: 'К выплате',
+      title: 'Выплачено',
+      dataIndex: 'total_paid',
+      key: 'total_paid',
+      width: 120,
+      align: 'right' as const,
+      render: (v: number) => <span style={{ color: '#fa8c16', fontWeight: 600 }}>-{v.toFixed(2)} ₽</span>,
+    },
+    {
+      title: 'Остаток',
       dataIndex: 'net_amount',
       key: 'net_amount',
       width: 130,
