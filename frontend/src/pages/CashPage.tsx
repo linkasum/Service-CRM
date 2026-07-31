@@ -549,19 +549,39 @@ const CashPage: React.FC = () => {
             <InputNumber min={txType === 'adjustment' ? undefined : 0.01} style={{width: '100%'}} placeholder="0.00" />
           </Form.Item>
           {txType === 'income' && (
-            <Form.Item label="Заказ (для начисления ЗП мастеру)" name="order_id">
-              <Select
-                showSearch
-                placeholder="Выберите заказ или оставьте пустым"
-                filterOption={false}
-                onSearch={searchOrders}
-                allowClear
-                options={orderList.map((o: any) => ({
-                  value: o.id,
-                  label: `#${o.id} ${o.client_name || ''} — ${o.device_model || ''} (${o.master_username || 'без мастера'})`
-                }))}
-              />
-            </Form.Item>
+            <>
+              <Form.Item name="income_type" initialValue="order">
+                <Select
+                  options={[
+                    {value: 'order', label: '💰 Оплата заказа'},
+                    {value: 'deposit', label: '🏦 Пополнение кассы'},
+                  ]}
+                  onChange={(val) => {
+                    if (val === 'deposit') txForm.setFieldValue('order_id', undefined)
+                  }}
+                />
+              </Form.Item>
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.income_type !== cur.income_type}>
+                {({ getFieldValue }) => {
+                  if (getFieldValue('income_type') === 'deposit') return null
+                  return (
+                    <Form.Item label="Заказ (для начисления ЗП мастеру)" name="order_id">
+                      <Select
+                        showSearch
+                        placeholder="Выберите заказ или оставьте пустым"
+                        filterOption={false}
+                        onSearch={searchOrders}
+                        allowClear
+                        options={orderList.map((o: any) => ({
+                          value: o.id,
+                          label: `#${o.id} ${o.client_name || ''} — ${o.device_model || ''} (${o.master_username || 'без мастера'})`
+                        }))}
+                      />
+                    </Form.Item>
+                  )
+                }}
+              </Form.Item>
+            </>
           )}
           {txType === 'expense' && (
             <>
@@ -571,6 +591,7 @@ const CashPage: React.FC = () => {
                     {value: 'general', label: '💸 Хоз. расход'},
                     {value: 'parts', label: '🔧 Запчасти для мастера (вычет 40%)'},
                     {value: 'salary', label: '💰 Выплата ЗП сотруднику'},
+                    {value: 'withdraw', label: '🏦 Снятие наличных'},
                   ]}
                   onChange={(val) => {
                     if (val !== 'parts') txForm.setFieldValue('order_id', undefined)
