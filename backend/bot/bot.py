@@ -20,7 +20,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
 )
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -1194,27 +1194,38 @@ async def salary_cmd(message: types.Message):
         await message.answer("Вы не авторизованы")
         return
     now = datetime.now()
-    period_start = datetime(now.year, now.month, 1)
-    period_end = datetime(now.year, now.month + 1, 1) - timedelta(seconds=1) if now.month < 12 else datetime(now.year + 1, 1, 1) - timedelta(seconds=1)
+    month_start = datetime(now.year, now.month, 1)
+    month_end = datetime(now.year, now.month + 1, 1) - timedelta(seconds=1) if now.month < 12 else datetime(now.year + 1, 1, 1) - timedelta(seconds=1)
     with Session(engine) as session:
+        # Входящий остаток (до начала месяца)
+        opening = 0.0
+        for s in ('accrued', 'deducted', 'paid'):
+            q = select(func.sum(SalaryRecord.calculated_amount)).where(
+                SalaryRecord.user_id == user["id"],
+                SalaryRecord.status == s,
+                SalaryRecord.period_start < month_start,
+            )
+            opening += session.exec(q).first() or 0
+        
+        # Записи за текущий месяц
         records = session.exec(
             select(SalaryRecord).where(
                 SalaryRecord.user_id == user["id"],
-                SalaryRecord.period_start >= period_start,
-                SalaryRecord.period_start <= period_end,
+                SalaryRecord.period_start >= month_start,
+                SalaryRecord.period_start <= month_end,
             )
         ).all()
     accrued = sum(record.calculated_amount for record in records if record.status == "accrued")
     deducted = sum(abs(record.calculated_amount) for record in records if record.status == "deducted")
     paid = sum(abs(record.calculated_amount) for record in records if record.status == "paid")
-    net = accrued - deducted
-    balance = net - paid
+    balance = opening + accrued - deducted - paid
     await message.answer(
-        f"Зарплата {period_start.strftime('%d.%m')}-{period_end.strftime('%d.%m')}:\n"
+        f"Зарплата {month_start.strftime('%d.%m')}-{month_end.strftime('%d.%m')}:\n"
+        f"Вх. остаток: {rub(opening)}\n"
         f"Начислено: {rub(accrued)}\n"
         f"Удержано: {rub(deducted)}\n"
         f"Выплачено: {rub(paid)}\n"
-        f"Остаток: {rub(max(balance, 0))}\n"
+        f"Остаток: {rub(balance)}\n"
         f"Записей: {len(records)}"
     )
 
