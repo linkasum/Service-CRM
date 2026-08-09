@@ -170,11 +170,12 @@ def print_document_html(
     # Для work_act — одна строка с общей суммой
     if template_type == "work_act":
         service_names = ", ".join(si.service_name for si in order.service_items) if order.service_items else (order.complaint or "Ремонт")
+        max_warranty = max((si.warranty_days or 30 for si in order.service_items), default=30)
         total = order.total_cost or 0
         items_rows.append(
             f'<tr><td>1</td>'
             f'<td>{service_names}</td>'
-            f'<td style="text-align:right">{order.warranty_days or 30}</td>'
+            f'<td style="text-align:right">{max_warranty}</td>'
             f'<td style="text-align:right">{total:.2f}</td>'
             f'<td style="text-align:right">0.00</td>'
             f'<td style="text-align:right">1</td>'
@@ -191,7 +192,7 @@ def print_document_html(
                 items_rows.append(
                     f'<tr><td>{idx}</td>'
                     f'<td>{si.service_name or "Услуга"}</td>'
-                    f'<td style="text-align:right">{order.warranty_days or 30}</td>'
+                    f'<td style="text-align:right">{si.warranty_days or 30}</td>'
                     f'<td style="text-align:right">{price:.2f}</td>'
                     f'<td style="text-align:right">0.00</td>'
                     f'<td style="text-align:right">{qty}</td>'

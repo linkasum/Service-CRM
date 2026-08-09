@@ -413,6 +413,7 @@ const OrderDetailPage: React.FC = () => {
         service_name: serviceName,
         price_at_order: values.price || servicePrice,
         quantity: values.quantity || 1,
+        warranty_days: values.warranty_days || 30,
         comment: values.comment,
       }, { headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') } })
       message.success('Услуга добавлена')
@@ -676,6 +677,7 @@ const OrderDetailPage: React.FC = () => {
                           { title: '', key: 'icon', width: 30, render: () => '🔧' },
                           { title: 'Название', dataIndex: 'service_name', key: 'name', render: (v: string) => <Text style={{fontSize: 12, color: textColor}}>{v}</Text> },
                           { title: 'Кол-во', dataIndex: 'quantity', key: 'qty', width: 50, render: (v: number) => <Text style={{fontSize: 12, color: textColor}}>{v}</Text> },
+                          { title: 'Гар.', dataIndex: 'warranty_days', key: 'warranty', width: 45, render: (v: number) => v > 0 ? <Tag color="green" style={{margin:0, fontSize: 10}}>{v}д</Tag> : '—' },
                           { title: 'Цена', dataIndex: 'price_at_order', key: 'price', width: 70, render: (v: number) => <Text style={{fontSize: 12, color: textColor}}>{v.toFixed(0)}₽</Text> },
                           { title: 'Сумма', key: 'total', width: 70, render: (_: any, r: any) => <Text style={{fontSize: 12, color: textColor, fontWeight: 600}}>{(r.quantity * r.price_at_order).toFixed(0)}₽</Text> },
                           { title: '', key: 'del', width: 40, render: (_: any, r: any) => (
@@ -1144,6 +1146,9 @@ const OrderDetailPage: React.FC = () => {
           </Form.Item>
           <Form.Item label="Количество" name="quantity" rules={[{ required: true }]} initialValue={1}>
             <Input type="number" min={1} />
+          </Form.Item>
+          <Form.Item label="Гарантия (дней)" name="warranty_days" initialValue={30}>
+            <Input type="number" min={0} max={365} />
           </Form.Item>
           <Form.Item label="Комментарий" name="comment">
             <Input />

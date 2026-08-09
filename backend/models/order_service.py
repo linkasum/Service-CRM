@@ -16,6 +16,7 @@ class OrderService(SQLModel, table=True):
     service_name: str = Field(max_length=200, description="Название на момент заказа")
     price_at_order: float = Field(default=0, description="Цена на момент заказа")
     quantity: int = Field(default=1, ge=1)
+    warranty_days: int = Field(default=30, ge=0, description="Гарантия в днях")
     created_at: datetime = Field(default_factory=datetime.now)
     comment: Optional[str] = Field(default=None, sa_column=Column(Text))
 

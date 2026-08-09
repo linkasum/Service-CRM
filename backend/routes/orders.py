@@ -254,6 +254,7 @@ def _enrich_order(order: Order, session: Session) -> dict:
             "service_name": os_item.service_name,
             "quantity": os_item.quantity,
             "price_at_order": os_item.price_at_order,
+            "warranty_days": os_item.warranty_days or 30,
             "comment": os_item.comment,
         }
         for os_item in order.service_items

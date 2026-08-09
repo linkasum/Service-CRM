@@ -34,6 +34,7 @@ def add_service_to_order(
         service_name=data.get("service_name", ""),
         price_at_order=float(data.get("price_at_order", 0) or 0),
         quantity=int(data.get("quantity", 1) or 1),
+        warranty_days=int(data.get("warranty_days", 30) or 30),
         comment=data.get("comment", ""),
     )
     session.add(os_item)
