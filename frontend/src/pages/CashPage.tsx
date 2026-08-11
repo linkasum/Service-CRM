@@ -620,7 +620,7 @@ const CashPage: React.FC = () => {
                   if (et === 'salary') return (
                     <Form.Item label="Сотрудник" name="master_id" rules={[{required: true, message: 'Выберите сотрудника'}]}>
                       <Select placeholder="Выберите сотрудника"
-                        options={employees.map((m: any) => ({value: m.id, label: m.full_name || m.username}))}
+                        options={employees.filter((m: any) => m.role_name !== 'admin').map((m: any) => ({value: m.id, label: `${m.full_name || m.username} (${m.username})`}))}
                       />
                     </Form.Item>
                   )
