@@ -316,11 +316,23 @@ def orders_query_for_user(user: dict):
 
 PAGE_SIZE = 8
 
+def device_label(order: Order) -> str:
+    parts = []
+    category = (order.device_category or "").strip()
+    if category and category.lower() != "phone":
+        parts.append(category)
+    if (order.device_brand or "").strip():
+        parts.append(order.device_brand.strip())
+    if (order.device_model or "").strip():
+        parts.append(order.device_model.strip())
+    return " ".join(parts) or "—"
+
+
 def orders_list_keyboard(orders: list[Order], page: int = 0, total: int = 0, back_callback: str = "menu") -> InlineKeyboardMarkup:
     rows = []
     start = page * PAGE_SIZE
     for order in orders[start : start + PAGE_SIZE]:
-        text = f"#{order.id} {status_label(order.status)} - {order.device_model[:24]}"
+        text = f"#{order.id} {status_label(order.status)} - {device_label(order)[:28]}"
         rows.append([InlineKeyboardButton(text=text, callback_data=f"order:{order.id}")])
     nav = []
     if page > 0:
@@ -411,7 +423,7 @@ def format_order(order: Order, comments: list[OrderComment] | None = None) -> st
     lines = [
         f"Заказ #{order.id}",
         f"Статус: {status_label(order.status)}",
-        f"Устройство: {order.device_brand or ''} {order.device_model}".strip(),
+        f"Устройство: {device_label(order)}",
         f"Клиент: {order.client_name}",
         f"Телефон: {order.client_phone}",
         f"Проблема: {order.complaint[:300]}",
