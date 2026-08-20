@@ -226,7 +226,7 @@ const CashPage: React.FC = () => {
   const openPaymentModal = (order: any) => {
     setSelectedOrder(order)
     paymentForm.resetFields()
-    paymentForm.setFieldsValue({ method: 'card', amount: order.total_cost })
+    paymentForm.setFieldsValue({ cash_amount: 0, card_amount: order.total_cost || 0 })
     setPaymentModal(true)
   }
 
@@ -234,27 +234,47 @@ const CashPage: React.FC = () => {
     if (!selectedOrder) return
     const values = await paymentForm.validateFields()
     
+    const cashAmount = Number(values.cash_amount) || 0
+    const cardAmount = Number(values.card_amount) || 0
+    const totalAmount = cashAmount + cardAmount
+    
+    if (totalAmount <= 0) {
+      message.error('Введите сумму оплаты (наличными или картой)')
+      return
+    }
+    
     try {
       setPrinting(true)
       
       const token = localStorage.getItem('token') || ''
       const orderId = selectedOrder.id
-      
-      const methodLabel = values.method === 'card' ? 'Карта' : values.method === 'transfer' ? 'Перевод' : values.method === 'invoice' ? 'Счёт' : 'Наличные'
 
-      // Создаём платёж (бэкенд сам создаст cash-транзакцию и OrderPayment)
-      await api.post('/payments/', {
-        order_id: orderId,
-        amount: values.amount,
-        payment_type: 'final',
-        method: values.method === 'cash' ? 'cash' : 'card',
-        comment: `Оплата через кассу (${methodLabel})`,
-      })
+      // Наличная часть
+      if (cashAmount > 0) {
+        await api.post('/payments/', {
+          order_id: orderId,
+          amount: cashAmount,
+          payment_type: 'final',
+          method: 'cash',
+          comment: 'Оплата через кассу (Наличные)',
+        })
+      }
+
+      // Безналичная часть
+      if (cardAmount > 0) {
+        await api.post('/payments/', {
+          order_id: orderId,
+          amount: cardAmount,
+          payment_type: 'final',
+          method: 'card',
+          comment: 'Оплата через кассу (Карта)',
+        })
+      }
 
       // Обновляем сумму заказа перед сменой статуса
       await api.patch(`/orders/${orderId}`, {
-        total_cost: values.amount,
-        paid_amount: values.amount,
+        total_cost: totalAmount,
+        paid_amount: totalAmount,
       })
       
       // Меняем статус на "Выдан" (бэкенд сам начислит зарплату)
@@ -279,7 +299,7 @@ const CashPage: React.FC = () => {
         }
       }
       
-      message.success(`Заказ #${orderId} выдан, оплата ${values.amount}₽ проведена`)
+      message.success(`Заказ #${orderId} выдан, оплата ${totalAmount}₽ проведена`)
       setPaymentModal(false)
       paymentForm.resetFields()
       
@@ -664,17 +684,33 @@ const CashPage: React.FC = () => {
             </Card>
 
             <Form form={paymentForm} layout="vertical">
-              <Form.Item label="Сумма оплаты" name="amount" rules={[{required: true}]}>
-                <InputNumber min={0} style={{width: '100%'}} size="large" />
-              </Form.Item>
-
-              <Form.Item label="Способ оплаты" name="method" initialValue="cash">
-                <Select size="large">
-                  <Select.Option value="cash">💵 Наличные</Select.Option>
-                  <Select.Option value="card">💳 Карта</Select.Option>
-                  <Select.Option value="transfer">📱 Перевод</Select.Option>
-                  <Select.Option value="invoice">🧾 Счёт</Select.Option>
-                </Select>
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.cash_amount !== cur.cash_amount || prev.card_amount !== cur.card_amount}>
+                {({ getFieldValue }) => {
+                  const cash = Number(getFieldValue('cash_amount')) || 0
+                  const card = Number(getFieldValue('card_amount')) || 0
+                  const total = cash + card
+                  return (
+                    <Row gutter={12}>
+                      <Col span={12}>
+                        <Form.Item label="💵 Наличными" name="cash_amount">
+                          <InputNumber min={0} style={{width: '100%'}} size="large" placeholder="0" />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item label="💳 Картой" name="card_amount">
+                          <InputNumber min={0} style={{width: '100%'}} size="large" placeholder="0" />
+                        </Form.Item>
+                      </Col>
+                      <Col span={24} style={{marginTop: -8, marginBottom: 12}}>
+                        <Text type="secondary">Итого оплата: </Text>
+                        <Text strong style={{fontSize: 16, color: '#1890ff'}}>{total.toFixed(2)}₽</Text>
+                        {selectedOrder?.total_cost && total !== Number(selectedOrder.total_cost) && (
+                          <Text type="warning" style={{marginLeft: 12, fontSize: 12}}>⚠️ к оплате {selectedOrder.total_cost}₽</Text>
+                        )}
+                      </Col>
+                    </Row>
+                  )
+                }}
               </Form.Item>
 
               <Divider style={{margin: '12px 0'}} />
