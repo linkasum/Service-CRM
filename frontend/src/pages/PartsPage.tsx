@@ -67,7 +67,8 @@ const PartsPage: React.FC = () => {
   const fetchMasters = async () => {
     try {
       const data = await getUsers()
-      setMasters(Array.isArray(data) ? data : data.items || data.data?.items || [])
+      const items = Array.isArray(data) ? data : data.items || data.data?.items || []
+      setMasters(items.filter((u: any) => u.role_name === 'master'))
     } catch {
       // non-critical
     }
@@ -438,7 +439,7 @@ const PartsPage: React.FC = () => {
                     <Select placeholder="Выберите мастера" showSearch optionFilterProp="children">
                       {masters.map((m) => (
                         <Select.Option key={m.id} value={m.id}>
-                          {m.full_name || m.username}
+                          {m.full_name || m.username} ({m.username})
                         </Select.Option>
                       ))}
                     </Select>
@@ -500,7 +501,7 @@ const PartsPage: React.FC = () => {
               <Select placeholder="Выберите мастера" showSearch optionFilterProp="children">
                 {masters.map((m) => (
                   <Select.Option key={m.id} value={m.id}>
-                    {m.full_name || m.username}
+                    {m.full_name || m.username} ({m.username})
                   </Select.Option>
                 ))}
               </Select>

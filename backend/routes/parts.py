@@ -178,10 +178,13 @@ def part_movement(
         
         part.quantity -= movement.quantity
         
+        # Если мастер не передан явно — берём мастера из заказа
+        master_id = movement.master_id or order.master_id
+
         # Определить имя мастера
         master_name = None
-        if movement.master_id:
-            master = session.get(User, movement.master_id)
+        if master_id:
+            master = session.get(User, master_id)
             master_name = master.username if master else None
 
         # Создать запись OrderPart
@@ -190,7 +193,7 @@ def part_movement(
             part_id=part_id,
             quantity=movement.quantity,
             price_at_order=part.sale_price,
-            master_id=movement.master_id,
+            master_id=master_id,
         )
         session.add(order_part)
         
@@ -201,10 +204,10 @@ def part_movement(
         session.add(order)
 
         # Вычитаем стоимость запчасти из баланса мастера (40% от цены запчасти)
-        if movement.master_id:
+        if master_id:
             from models.salary_record import SalaryRecord
             master_deduction = SalaryRecord(
-                user_id=movement.master_id,
+                user_id=master_id,
                 order_id=movement.order_id,
                 calculated_amount=-(added_cost * 0.4),
                 status="deducted",

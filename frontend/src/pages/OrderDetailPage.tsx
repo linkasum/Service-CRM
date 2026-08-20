@@ -480,7 +480,7 @@ const OrderDetailPage: React.FC = () => {
   const handleAddPart = async () => {
     const values = await addPartForm.validateFields()
     try {
-      await partMovement(values.part_id, 'write_off', values.quantity, Number(id))
+      await partMovement(values.part_id, 'write_off', values.quantity, Number(id), (order as any)?.master_id)
       message.success('Запчасть добавлена')
       setAddPartModal(false)
       addPartForm.resetFields()
