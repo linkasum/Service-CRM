@@ -123,6 +123,9 @@ const OrderDetailPage: React.FC = () => {
   const [availableServices, setAvailableServices] = useState<any[]>([])
   const [addServiceModal, setAddServiceModal] = useState(false)
   const [addServiceForm] = Form.useForm()
+  const [editServiceModal, setEditServiceModal] = useState(false)
+  const [editServiceForm] = Form.useForm()
+  const [editingServiceId, setEditingServiceId] = useState<number | null>(null)
 
   // Модалки редактирования
   const [editClientModal, setEditClientModal] = useState(false)
@@ -279,7 +282,7 @@ const OrderDetailPage: React.FC = () => {
       defaultAmount = totalPaid > 0 ? totalPaid : 0
     }
     
-    paymentForm.setFieldsValue({ payment_type: type, method: 'cash', amount: defaultAmount || 0 })
+    paymentForm.setFieldsValue({ payment_type: type, cash_amount: 0, card_amount: defaultAmount || 0 })
     setPaymentModal(true)
   }
 
@@ -302,8 +305,24 @@ const OrderDetailPage: React.FC = () => {
       const token = localStorage.getItem('token') || ''
       const oid = Number(id)
 
-      // Создаём платёж (бэкенд сам создаст cash-транзакцию и обработает возврат/зарплату)
-      await createPayment({ order_id: oid, ...values })
+      const cashAmount = Number(values.cash_amount) || 0
+      const cardAmount = Number(values.card_amount) || 0
+
+      if (pType === 'refund' || pType === 'expense') {
+        // Возврат/расход — одним платежом наличными
+        const amount = cashAmount > 0 ? cashAmount : cardAmount
+        if (amount <= 0) { message.error('Введите сумму'); setPrinting(false); return }
+        await createPayment({ order_id: oid, amount, payment_type: pType, method: 'cash', comment: values.comment })
+      } else {
+        // Оплата/предоплата — поддержка разделённой оплаты
+        if (cashAmount > 0) {
+          await createPayment({ order_id: oid, amount: cashAmount, payment_type: pType, method: 'cash', comment: values.comment })
+        }
+        if (cardAmount > 0) {
+          await createPayment({ order_id: oid, amount: cardAmount, payment_type: pType, method: 'card', comment: values.comment })
+        }
+        if (cashAmount <= 0 && cardAmount <= 0) { message.error('Введите сумму'); setPrinting(false); return }
+      }
       
       // Финальная оплата: выдача заказа
       if (pType === 'final') {
@@ -423,6 +442,38 @@ const OrderDetailPage: React.FC = () => {
       loadComments()
     } catch (e: any) {
       message.error(e.response?.data?.detail || 'Ошибка')
+    }
+  }
+
+  const openEditService = (svc: any) => {
+    setEditingServiceId(svc.id)
+    editServiceForm.setFieldsValue({
+      service_name: svc.service_name,
+      price_at_order: svc.price_at_order,
+      quantity: svc.quantity,
+      warranty_days: svc.warranty_days ?? 30,
+      comment: svc.comment,
+    })
+    setEditServiceModal(true)
+  }
+
+  const handleEditService = async () => {
+    if (editingServiceId == null) return
+    const values = await editServiceForm.validateFields()
+    try {
+      await axios.patch(`/api/order-services/${editingServiceId}`, {
+        service_name: values.service_name,
+        price_at_order: values.price_at_order,
+        quantity: values.quantity,
+        warranty_days: values.warranty_days,
+        comment: values.comment,
+      }, { headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') } })
+      message.success('Услуга обновлена')
+      setEditServiceModal(false)
+      loadOrder()
+      loadComments()
+    } catch (e: any) {
+      message.error(e.response?.data?.detail || 'Ошибка обновления')
     }
   }
 
@@ -680,12 +731,15 @@ const OrderDetailPage: React.FC = () => {
                           { title: 'Гар.', dataIndex: 'warranty_days', key: 'warranty', width: 45, render: (v: number) => v > 0 ? <Tag color="green" style={{margin:0, fontSize: 10}}>{v}д</Tag> : '—' },
                           { title: 'Цена', dataIndex: 'price_at_order', key: 'price', width: 70, render: (v: number) => <Text style={{fontSize: 12, color: textColor}}>{v.toFixed(0)}₽</Text> },
                           { title: 'Сумма', key: 'total', width: 70, render: (_: any, r: any) => <Text style={{fontSize: 12, color: textColor, fontWeight: 600}}>{(r.quantity * r.price_at_order).toFixed(0)}₽</Text> },
-                          { title: '', key: 'del', width: 40, render: (_: any, r: any) => (
-                            <Popconfirm title="Удалить услугу?" onConfirm={async () => {
-                              try { await axios.delete(`/api/order-services/${r.id}`, { headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') } }); message.success('Удалено'); loadOrder() } catch {}
-                            }}>
-                              <Button size="small" danger icon={<DeleteOutlined />} style={{padding: '0 4px'}} />
-                            </Popconfirm>
+                          { title: '', key: 'del', width: 80, render: (_: any, r: any) => (
+                            <Space size={0}>
+                              <Button size="small" type="text" icon={<EditOutlined />} style={{padding: '0 4px'}} onClick={() => openEditService(r)} />
+                              <Popconfirm title="Удалить услугу?" onConfirm={async () => {
+                                try { await axios.delete(`/api/order-services/${r.id}`, { headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') } }); message.success('Удалено'); loadOrder() } catch {}
+                              }}>
+                                <Button size="small" danger icon={<DeleteOutlined />} style={{padding: '0 4px'}} />
+                              </Popconfirm>
+                            </Space>
                           )},
                         ]}
                       />
@@ -1018,17 +1072,32 @@ const OrderDetailPage: React.FC = () => {
         <Form form={paymentForm} layout="vertical">
           <Form.Item name="payment_type" hidden><Input /></Form.Item>
           
-          <Form.Item label="Сумма" name="amount" rules={[{ required: true, message: 'Введите сумму' }]}>
-            <Input type="number" placeholder="0.00" autoFocus />
-          </Form.Item>
-          
-          <Form.Item label="Способ оплаты" name="method">
-            <Select options={[
-              { label: '💵 Наличные', value: 'cash' },
-              { label: '💳 Карта', value: 'card' },
-              { label: '📱 Перевод', value: 'transfer' },
-              { label: '🧾 Счёт', value: 'invoice' },
-            ]} />
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.cash_amount !== cur.cash_amount || prev.card_amount !== cur.card_amount}>
+            {({ getFieldValue }) => {
+              const cash = Number(getFieldValue('cash_amount')) || 0
+              const card = Number(getFieldValue('card_amount')) || 0
+              const total = cash + card
+              return (
+                <>
+                  <Row gutter={12}>
+                    <Col span={12}>
+                      <Form.Item label="💵 Наличными" name="cash_amount">
+                        <Input type="number" min={0} placeholder="0" autoFocus />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item label="💳 Картой" name="card_amount">
+                        <Input type="number" min={0} placeholder="0" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <div style={{ marginTop: -8, marginBottom: 8 }}>
+                    <Text type="secondary">Итого: </Text>
+                    <Text strong style={{ color: '#1890ff' }}>{total.toFixed(2)}₽</Text>
+                  </div>
+                </>
+              )
+            }}
           </Form.Item>
           
           <Form.Item label="Комментарий" name="comment">
@@ -1148,6 +1217,27 @@ const OrderDetailPage: React.FC = () => {
             <Input type="number" min={1} />
           </Form.Item>
           <Form.Item label="Гарантия (дней)" name="warranty_days" initialValue={30}>
+            <Input type="number" min={0} max={365} />
+          </Form.Item>
+          <Form.Item label="Комментарий" name="comment">
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* ===== Модалка: Редактирование услуги ===== */}
+      <Modal title="✏️ Изменить услугу" open={editServiceModal} onOk={handleEditService} onCancel={() => setEditServiceModal(false)} width={420}>
+        <Form form={editServiceForm} layout="vertical">
+          <Form.Item label="Название" name="service_name" rules={[{ required: true, message: 'Введите название' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item label="Цена" name="price_at_order">
+            <Input type="number" min={0} placeholder="0" />
+          </Form.Item>
+          <Form.Item label="Количество" name="quantity" rules={[{ required: true }]}>
+            <Input type="number" min={1} />
+          </Form.Item>
+          <Form.Item label="Гарантия (дней)" name="warranty_days">
             <Input type="number" min={0} max={365} />
           </Form.Item>
           <Form.Item label="Комментарий" name="comment">
