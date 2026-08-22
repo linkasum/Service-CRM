@@ -13,6 +13,8 @@ from models.order_part import OrderPart
 from models.order import Order
 from models.order_comment import OrderComment
 from models.order_payment import OrderPayment
+from models.cash_shift import CashShift
+from models.cash_transaction import CashTransaction, TransactionType, PaymentMethod as CashPaymentMethod
 from models.user import User
 from schemas.part import PartCreate, PartUpdate, PartRead, PartMovement, WriteOffRead
 from core.logging import logger
@@ -216,6 +218,29 @@ def part_movement(
                 comment=f"Списание запчасти: {part.name} x{movement.quantity} = {added_cost}руб",
             )
             session.add(master_deduction)
+
+            # Кассовая транзакция выдачи денег мастеру за запчасть
+            active_shift = session.exec(
+                select(CashShift).where(CashShift.is_open == True).order_by(CashShift.opened_at.desc())
+            ).first()
+            if active_shift:
+                cash_tx = CashTransaction(
+                    shift_id=active_shift.id,
+                    order_id=movement.order_id,
+                    transaction_type=TransactionType.expense,
+                    payment_method=CashPaymentMethod.cash,
+                    amount=-added_cost,
+                    comment=f"Выдача денег мастеру за запчасть: {part.name} x{movement.quantity}",
+                    created_by=current_user.id,
+                )
+                session.add(cash_tx)
+                # Пересчёт баланса смены
+                cash_txs = session.exec(
+                    select(CashTransaction).where(CashTransaction.shift_id == active_shift.id)
+                ).all()
+                cash_net = sum(t.amount for t in cash_txs if t.payment_method in (None, CashPaymentMethod.cash))
+                active_shift.final_amount = active_shift.initial_amount + cash_net
+                session.add(active_shift)
 
         # Системный комментарий
         comment_text = f"📦 Списана запчасть: {part.name} × {movement.quantity} = {added_cost}₽"
