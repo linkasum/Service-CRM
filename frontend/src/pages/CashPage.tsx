@@ -7,7 +7,7 @@ import {
 import { 
   PlusOutlined, CloseOutlined, PayCircleOutlined, MinusCircleOutlined,
   ReloadOutlined, DollarOutlined, ShoppingCartOutlined, EyeOutlined,
-  WalletOutlined
+  WalletOutlined, SwapOutlined
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api from '../api'
@@ -40,6 +40,8 @@ const CashPage: React.FC = () => {
   const [openForm] = Form.useForm()
   const [closeForm] = Form.useForm()
   const [txForm] = Form.useForm()
+  const [transferModal, setTransferModal] = useState(false)
+  const [transferForm] = Form.useForm()
   const [prevBalance, setPrevBalance] = useState<number | null>(null)
   const [loadingPrevBalance, setLoadingPrevBalance] = useState(false)
   const [paymentModal, setPaymentModal] = useState(false)
@@ -224,6 +226,34 @@ const CashPage: React.FC = () => {
     setTxModal(true)
   }
 
+  const openTransferModal = () => {
+    transferForm.resetFields()
+    transferForm.setFieldsValue({ direction: 'cash_to_card' })
+    setTransferModal(true)
+  }
+
+  const handleTransfer = async () => {
+    const values = await transferForm.validateFields()
+    try {
+      const amount = Number(values.amount)
+      if (values.direction === 'cash_to_card') {
+        // Нал → Безнал: расход нала + приход безнала
+        await api.post('/cash/transaction', { transaction_type: 'expense', amount, payment_method: 'cash', comment: 'Перевод с нала на безнал' })
+        await api.post('/cash/transaction', { transaction_type: 'income', amount, payment_method: 'card', comment: 'Перевод с нала на безнал' })
+      } else {
+        // Безнал → Нал: расход безнала + приход нала
+        await api.post('/cash/transaction', { transaction_type: 'expense', amount, payment_method: 'card', comment: 'Перевод с безнала на нал' })
+        await api.post('/cash/transaction', { transaction_type: 'income', amount, payment_method: 'cash', comment: 'Перевод с безнала на нал' })
+      }
+      message.success(`Перевод ${amount}₽ выполнен`)
+      setTransferModal(false)
+      loadShift()
+      loadTransactions()
+    } catch (e: any) {
+      message.error(e.response?.data?.detail || 'Ошибка перевода')
+    }
+  }
+
   const openPaymentModal = (order: any) => {
     setSelectedOrder(order)
     paymentForm.resetFields()
@@ -395,6 +425,7 @@ const CashPage: React.FC = () => {
           <Space size={8}>
             <Button size="small" icon={<PayCircleOutlined />} onClick={() => openTxModal('income')}>Приход</Button>
             <Button size="small" icon={<MinusCircleOutlined />} onClick={() => openTxModal('expense')}>Расход</Button>
+            <Button size="small" icon={<SwapOutlined />} onClick={openTransferModal}>Перевод</Button>
             <Button size="small" icon={<ReloadOutlined />} onClick={() => openTxModal('cashout')}>Инкассация</Button>
             <Button size="small" icon={<ReloadOutlined />} onClick={loadShift}>🔄</Button>
           </Space>
@@ -658,6 +689,24 @@ const CashPage: React.FC = () => {
           )}
           <Form.Item label="Комментарий" name="comment">
             <Input placeholder="Описание операции..." />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Модалка перевода нал/безнал */}
+      <Modal title="🔁 Перевод" open={transferModal} onOk={handleTransfer} onCancel={() => setTransferModal(false)} width={420}>
+        <Form form={transferForm} layout="vertical">
+          <Form.Item label="Сумма" name="amount" rules={[{required: true, message: 'Введите сумму'}]}>
+            <InputNumber min={0.01} style={{width: '100%'}} placeholder="0.00" />
+          </Form.Item>
+          <Form.Item label="Направление" name="direction" initialValue="cash_to_card">
+            <Select>
+              <Select.Option value="cash_to_card">💵 Нал → 💳 Безнал</Select.Option>
+              <Select.Option value="card_to_cash">💳 Безнал → 💵 Нал</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="Комментарий" name="comment">
+            <Input placeholder="Описание..." />
           </Form.Item>
         </Form>
       </Modal>
