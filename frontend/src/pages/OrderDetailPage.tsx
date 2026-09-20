@@ -668,6 +668,16 @@ const OrderDetailPage: React.FC = () => {
             />
           </Space>
           <Space>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+              const params = new URLSearchParams({
+                client_name: o.client_name || '',
+                client_phone: o.client_phone || '',
+                client_email: o.client_email || '',
+                age_group: o.age_group || '',
+                source: o.source || '',
+              })
+              navigate(`/orders/create?${params.toString()}`)
+            }}>Принять от этого клиента ещё</Button>
             <Button icon={<PrinterOutlined />} onClick={() => {
               const token = localStorage.getItem('token')
               window.open(`/api/documents/print/${o.id}/receipt?token=${token}`, '_blank', 'noopener,noreferrer')

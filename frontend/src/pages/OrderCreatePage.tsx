@@ -4,7 +4,7 @@ import {
   Typography, Divider, InputNumber, Spin
 } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, UserOutlined, PhoneOutlined, MailOutlined, CheckCircleOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createOrder, getClients, getUsers, searchClientByPhone, getBrands, createBrand, getCategories, createCategory, getDeviceModels, createDeviceModel, getAccessoryTemplates, createAccessoryTemplate } from '../api'
 import api from '../api'
 import { useTheme } from '../contexts/ThemeContext'
@@ -48,6 +48,7 @@ const ORDER_AGE_GROUPS_DEFAULT = [
 
 const OrderCreatePage: React.FC = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { mode } = useTheme()
   const isDark = mode === 'dark'
   const [form] = Form.useForm()
@@ -87,6 +88,25 @@ const OrderCreatePage: React.FC = () => {
     loadSources()
     loadAgeGroups()
   }, [])
+
+  // Предзаполнение данных клиента из query-параметров (пришли со страницы заказа)
+  useEffect(() => {
+    const clientName = searchParams.get('client_name')
+    const clientPhone = searchParams.get('client_phone')
+    const clientEmail = searchParams.get('client_email')
+    const ageGroup = searchParams.get('age_group')
+    const source = searchParams.get('source')
+    if (clientName || clientPhone || clientEmail || ageGroup || source) {
+      const fields: Record<string, string> = {}
+      if (clientName) fields.client_name = clientName
+      if (clientPhone) fields.client_phone = formatPhone(clientPhone)
+      if (clientEmail) fields.client_email = clientEmail
+      if (ageGroup) fields.age_group = ageGroup
+      if (source) fields.source = source
+      form.setFieldsValue(fields)
+      setClientFound(true)
+    }
+  }, [searchParams])
 
   // Закрытие dropdown при клике вне
   useEffect(() => {
