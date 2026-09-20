@@ -89,24 +89,48 @@ const OrderCreatePage: React.FC = () => {
     loadAgeGroups()
   }, [])
 
-  // Предзаполнение данных клиента из query-параметров (пришли со страницы заказа)
+  // Предзаполнение данных клиента и устройства из query-параметров (пришли со страницы заказа)
   useEffect(() => {
     const clientName = searchParams.get('client_name')
     const clientPhone = searchParams.get('client_phone')
     const clientEmail = searchParams.get('client_email')
     const ageGroup = searchParams.get('age_group')
     const source = searchParams.get('source')
-    if (clientName || clientPhone || clientEmail || ageGroup || source) {
-      const fields: Record<string, string> = {}
-      if (clientName) fields.client_name = clientName
-      if (clientPhone) fields.client_phone = formatPhone(clientPhone)
-      if (clientEmail) fields.client_email = clientEmail
-      if (ageGroup) fields.age_group = ageGroup
-      if (source) fields.source = source
-      form.setFieldsValue(fields)
-      setClientFound(true)
+    const deviceCategory = searchParams.get('device_category')
+    const deviceBrand = searchParams.get('device_brand')
+    const deviceModel = searchParams.get('device_model')
+    const serialNumber = searchParams.get('serial_number')
+    const complaint = searchParams.get('complaint')
+    const appearance = searchParams.get('appearance')
+    const warranty = searchParams.get('warranty')
+
+    const fields: Record<string, any> = {}
+    if (clientName) fields.client_name = clientName
+    if (clientPhone) fields.client_phone = formatPhone(clientPhone)
+    if (clientEmail) fields.client_email = clientEmail
+    if (ageGroup) fields.age_group = ageGroup
+    if (source) fields.source = source
+    if (deviceCategory) fields.device_category = deviceCategory
+    if (deviceModel) fields.device_model = deviceModel
+    if (serialNumber) fields.serial_number = serialNumber
+    if (complaint) fields.complaint = complaint
+    if (appearance) fields.appearance = appearance
+    if (warranty === 'true') fields.is_warranty = true
+
+    // Бренд приходит именем, а форма ожидает ID — ищем по имени
+    if (deviceBrand) {
+      const brand = brands.find((b: any) => (b.name || '').toLowerCase() === deviceBrand.toLowerCase())
+      if (brand) {
+        fields.device_brand = brand.id
+        setSelectedBrandId(brand.id)
+      }
     }
-  }, [searchParams])
+
+    if (Object.keys(fields).length > 0) {
+      form.setFieldsValue(fields)
+    }
+    if (clientName || clientPhone) setClientFound(true)
+  }, [searchParams, brands])
 
   // Закрытие dropdown при клике вне
   useEffect(() => {

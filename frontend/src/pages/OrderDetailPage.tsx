@@ -9,7 +9,7 @@ import {
   CheckCircleOutlined, ClockCircleOutlined, SendOutlined, MessageOutlined,
   UserOutlined, DollarOutlined, ShoppingCartOutlined, PaperClipOutlined, CameraOutlined,
   EditOutlined, PlusOutlined, CheckCircleFilled, DeleteOutlined, PayCircleOutlined,
-  MinusCircleOutlined, ReloadOutlined, EyeOutlined, SearchOutlined
+  MinusCircleOutlined, ReloadOutlined, EyeOutlined, SearchOutlined, SafetyCertificateOutlined
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -668,16 +668,6 @@ const OrderDetailPage: React.FC = () => {
             />
           </Space>
           <Space>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-              const params = new URLSearchParams({
-                client_name: o.client_name || '',
-                client_phone: o.client_phone || '',
-                client_email: o.client_email || '',
-                age_group: o.age_group || '',
-                source: o.source || '',
-              })
-              navigate(`/orders/create?${params.toString()}`)
-            }}>Принять от этого клиента ещё</Button>
             <Button icon={<PrinterOutlined />} onClick={() => {
               const token = localStorage.getItem('token')
               window.open(`/api/documents/print/${o.id}/receipt?token=${token}`, '_blank', 'noopener,noreferrer')
@@ -695,6 +685,37 @@ const OrderDetailPage: React.FC = () => {
               window.open(`/api/documents/print/${o.id}/invoice?token=${token}`, '_blank', 'noopener,noreferrer')
             }}>Счёт</Button>
           </Space>
+        </div>
+
+        {/* Панель действий с клиентом */}
+        <div style={{ padding: '8px 24px', borderBottom: `1px solid ${borderColor}`, background: headerBg, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+            const params = new URLSearchParams({
+              client_name: o.client_name || '',
+              client_phone: o.client_phone || '',
+              client_email: o.client_email || '',
+              age_group: o.age_group || '',
+              source: o.source || '',
+            })
+            navigate(`/orders/create?${params.toString()}`)
+          }}>Принять от этого клиента ещё</Button>
+          <Button danger type="primary" icon={<SafetyCertificateOutlined />} onClick={() => {
+            const params = new URLSearchParams({
+              client_name: o.client_name || '',
+              client_phone: o.client_phone || '',
+              client_email: o.client_email || '',
+              age_group: o.age_group || '',
+              source: o.source || '',
+              device_category: o.device_category || '',
+              device_brand: o.device_brand || '',
+              device_model: o.device_model || '',
+              serial_number: o.serial_number || '',
+              complaint: o.complaint || '',
+              appearance: o.appearance || '',
+              warranty: 'true',
+            })
+            navigate(`/orders/create?${params.toString()}`)
+          }}>Принять по гарантии</Button>
         </div>
 
         {/* Табы */}
