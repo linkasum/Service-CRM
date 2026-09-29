@@ -201,9 +201,9 @@ def create_payment(
                 user_id=existing_salary.user_id,
                 order_id=order_id,
                 calculated_amount=-salary_deduction,
-                status="accrued",
-                period_start=existing_salary.period_start,
-                period_end=existing_salary.period_end,
+                status="deducted",
+                period_start=datetime.now().replace(day=1),
+                period_end=datetime.now(),
                 comment=f"Возврат по заказу #{order_id} (-{salary_deduction:.2f}₽)",
             )
             session.add(salary_refund)

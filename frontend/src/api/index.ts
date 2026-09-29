@@ -164,8 +164,8 @@ export const updatePart = async (id: number, data: Record<string, any>) => {
   return response.data
 }
 
-export const partMovement = async (id: number, type: string, quantity: number, order_id?: number, master_id?: number) => {
-  const response = await api.post(`/parts/${id}/movement`, { type, quantity, order_id, master_id })
+export const partMovement = async (id: number, type: string, quantity: number, order_id?: number, master_id?: number, payment_method?: string) => {
+  const response = await api.post(`/parts/${id}/movement`, { type, quantity, order_id, master_id, payment_method: payment_method || 'cash' })
   return response.data
 }
 

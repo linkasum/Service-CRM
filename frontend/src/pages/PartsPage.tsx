@@ -131,7 +131,7 @@ const PartsPage: React.FC = () => {
         fetchParts()
       } else {
         // Create part
-        const { writeoff_master_id, writeoff_order_id, writeoff_quantity, ...partData } = values
+        const { writeoff_master_id, writeoff_order_id, writeoff_quantity, writeoff_payment_method, ...partData } = values
         const newPart = await createPart(partData)
 
         if (writeOffImmediately) {
@@ -140,7 +140,8 @@ const PartsPage: React.FC = () => {
             'write_off',
             writeoff_quantity ?? partData.quantity,
             writeoff_order_id,
-            writeoff_master_id
+            writeoff_master_id,
+            writeoff_payment_method
           )
           message.success('Запчасть добавлена и списана на мастера')
         } else {
@@ -182,7 +183,8 @@ const PartsPage: React.FC = () => {
         values.type,
         values.quantity,
         values.order_id,
-        values.master_id
+        values.master_id,
+        values.payment_method
       )
       message.success('Движение выполнено')
       setMovementModalOpen(false)
@@ -454,6 +456,12 @@ const PartsPage: React.FC = () => {
                   <Form.Item name="writeoff_quantity" label="Количество для списания">
                     <InputNumber min={1} style={{ width: '100%' }} placeholder="По умолчанию — всё количество" />
                   </Form.Item>
+                  <Form.Item name="writeoff_payment_method" label="Способ оплаты" initialValue="cash">
+                    <Select>
+                      <Select.Option value="cash">💵 Наличные</Select.Option>
+                      <Select.Option value="card">💳 Безналичные</Select.Option>
+                    </Select>
+                  </Form.Item>
                 </>
               )}
             </>
@@ -493,19 +501,27 @@ const PartsPage: React.FC = () => {
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
           {movementType === 'write_off' && (
-            <Form.Item
-              name="master_id"
-              label="Мастер"
-              rules={[{ required: true, message: 'Выберите мастера' }]}
-            >
-              <Select placeholder="Выберите мастера" showSearch optionFilterProp="children">
-                {masters.map((m) => (
-                  <Select.Option key={m.id} value={m.id}>
-                    {m.full_name || m.username} ({m.username})
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
+            <>
+              <Form.Item
+                name="master_id"
+                label="Мастер"
+                rules={[{ required: true, message: 'Выберите мастера' }]}
+              >
+                <Select placeholder="Выберите мастера" showSearch optionFilterProp="children">
+                  {masters.map((m) => (
+                    <Select.Option key={m.id} value={m.id}>
+                      {m.full_name || m.username} ({m.username})
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item name="payment_method" label="Способ оплаты" initialValue="cash">
+                <Select>
+                  <Select.Option value="cash">💵 Наличные</Select.Option>
+                  <Select.Option value="card">💳 Безналичные</Select.Option>
+                </Select>
+              </Form.Item>
+            </>
           )}
         </Form>
       </Modal>

@@ -33,6 +33,13 @@ def calculate_shift_balance(session: Session, shift: CashShift) -> dict:
     cash_expense = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.cash)
     # Только безнал
     card_income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.card)
+    card_expense = sum(abs(t.amount) for t in transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.card)
+
+    # Накопительный безналичный баланс по всем сменам (карта не инкассируется)
+    all_transactions = session.exec(select(CashTransaction)).all()
+    total_card_income = sum(t.amount for t in all_transactions if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.card)
+    total_card_expense = sum(abs(t.amount) for t in all_transactions if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.card)
+    card_balance = total_card_income - total_card_expense
 
     current_balance = shift.initial_amount + income - expense + adjustments
     cash_balance = shift.initial_amount + cash_income - cash_expense
@@ -44,6 +51,8 @@ def calculate_shift_balance(session: Session, shift: CashShift) -> dict:
         "cash_income": cash_income,
         "cash_expense": cash_expense,
         "card_income": card_income,
+        "card_expense": card_expense,
+        "card_balance": card_balance,
         "cash_balance": cash_balance,
         "transactions_count": len(transactions),
     }
@@ -227,7 +236,7 @@ def close_shift(
                         status='deducted',
                         period_start=datetime.now().replace(day=1),
                         period_end=datetime.now(),
-                        comment=comment_match,
+                        comment=t.comment or f'Авто: расход #{t.id}',
                     )
                     session.add(sr)
     session.commit()
@@ -370,16 +379,26 @@ def create_transaction(
     # Для расхода и инкассации — проверяем достаточность баланса
     if tx_type in (TransactionType.expense, TransactionType.cashout):
         spend = abs(amount)
+        check_method = (data.get("payment_method") or "cash")
         txs = session.exec(
             select(CashTransaction).where(CashTransaction.shift_id == shift.id)
         ).all()
-        current_income = sum(t.amount for t in txs if t.transaction_type == TransactionType.income and t.payment_method in (None, PaymentMethod.cash))
-        current_expense = sum(abs(t.amount) for t in txs if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method in (None, PaymentMethod.cash))
-        current_balance = shift.initial_amount + current_income - current_expense
+        if check_method == "card":
+            # Безналичный баланс — накопительный по всем сменам
+            all_txs = session.exec(select(CashTransaction)).all()
+            current_income = sum(t.amount for t in all_txs if t.transaction_type == TransactionType.income and t.payment_method == PaymentMethod.card)
+            current_expense = sum(abs(t.amount) for t in all_txs if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method == PaymentMethod.card)
+            current_balance = current_income - current_expense
+            balance_label = "Безналичный"
+        else:
+            current_income = sum(t.amount for t in txs if t.transaction_type == TransactionType.income and t.payment_method in (None, PaymentMethod.cash))
+            current_expense = sum(abs(t.amount) for t in txs if t.transaction_type in (TransactionType.expense, TransactionType.cashout) and t.payment_method in (None, PaymentMethod.cash))
+            current_balance = shift.initial_amount + current_income - current_expense
+            balance_label = "Наличный"
         if spend > current_balance:
             raise HTTPException(
                 status_code=400,
-                detail=f"Недостаточно средств в кассе. Текущий баланс: {current_balance:.2f}₽, запрошено: {spend:.2f}₽"
+                detail=f"Недостаточно средств. {balance_label} баланс: {current_balance:.2f}₽, запрошено: {spend:.2f}₽"
             )
 
     # Для расхода, возврата и инкассации делаем сумму отрицательной

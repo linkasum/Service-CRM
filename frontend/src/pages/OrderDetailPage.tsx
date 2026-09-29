@@ -480,7 +480,7 @@ const OrderDetailPage: React.FC = () => {
   const handleAddPart = async () => {
     const values = await addPartForm.validateFields()
     try {
-      await partMovement(values.part_id, 'write_off', values.quantity, Number(id), (order as any)?.master_id)
+      await partMovement(values.part_id, 'write_off', values.quantity, Number(id), (order as any)?.master_id, values.payment_method)
       message.success('Запчасть добавлена')
       setAddPartModal(false)
       addPartForm.resetFields()
@@ -1191,6 +1191,12 @@ const OrderDetailPage: React.FC = () => {
           </Form.Item>
           <Form.Item label="Количество" name="quantity" rules={[{ required: true }]} initialValue={1}>
             <Input type="number" min={1} />
+          </Form.Item>
+          <Form.Item label="Способ оплаты" name="payment_method" initialValue="cash">
+            <Select>
+              <Select.Option value="cash">💵 Наличные</Select.Option>
+              <Select.Option value="card">💳 Безналичные</Select.Option>
+            </Select>
           </Form.Item>
         </Form>
       </Modal>

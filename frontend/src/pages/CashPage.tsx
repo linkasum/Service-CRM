@@ -418,6 +418,7 @@ const CashPage: React.FC = () => {
           <Divider style={{margin:'12px 0', borderColor}} />
           <Row gutter={16} style={{marginBottom: 8}}>
             <Col span={8}><Statistic title="Безнал за смену" value={currentShift.card_income || 0} precision={0} suffix="₽" valueStyle={{color:'#722ed1',fontSize: 14}} /></Col>
+            <Col span={8}><Statistic title="Безнал (остаток)" value={currentShift.card_balance ?? currentShift.card_income ?? 0} precision={0} suffix="₽" valueStyle={{color:'#722ed1',fontSize: 14, fontWeight:'bold'}} /></Col>
             <Col span={8}><Statistic title="Всего приход" value={(currentShift.income || 0)} precision={0} suffix="₽" valueStyle={{color:'#52c41a',fontSize: 14}} /></Col>
             <Col span={8}><Statistic title="Общий оборот" value={(currentShift.income || 0) - (currentShift.expense || 0)} precision={0} suffix="₽" valueStyle={{color:'#faad14',fontSize: 16,fontWeight:'bold'}} /></Col>
           </Row>
@@ -590,6 +591,8 @@ const CashPage: React.FC = () => {
                 <Col span={12}>
                   <Text type="secondary" style={{fontSize:11}}>Безнал за смену</Text><br/>
                   <Text strong style={{color:'#722ed1', fontSize:16}}>{(currentShift.card_income || 0).toFixed(0)}₽</Text>
+                  <Text type="secondary" style={{fontSize:11}}>Безнал (остаток)</Text><br/>
+                  <Text strong style={{color:'#722ed1', fontSize:16}}>{(currentShift.card_balance ?? currentShift.card_income ?? 0).toFixed(0)}₽</Text>
                 </Col>
               </Row>
             </div>

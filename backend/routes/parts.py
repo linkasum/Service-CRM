@@ -224,11 +224,13 @@ def part_movement(
                 select(CashShift).where(CashShift.is_open == True).order_by(CashShift.opened_at.desc())
             ).first()
             if active_shift:
+                pm_str = movement.payment_method or "cash"
+                pm = CashPaymentMethod(pm_str) if pm_str in ("cash", "card") else CashPaymentMethod.cash
                 cash_tx = CashTransaction(
                     shift_id=active_shift.id,
                     order_id=movement.order_id,
                     transaction_type=TransactionType.expense,
-                    payment_method=CashPaymentMethod.cash,
+                    payment_method=pm,
                     amount=-added_cost,
                     comment=f"Выдача денег мастеру за запчасть: {part.name} x{movement.quantity}",
                     created_by=current_user.id,

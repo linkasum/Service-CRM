@@ -48,6 +48,10 @@ class PartMovement(BaseModel):
         default=True,
         description="Для прихода: закупка оплачена наличными из кассы"
     )
+    payment_method: Optional[str] = Field(
+        default=None,
+        description="Способ оплаты при списании в заказ: cash или card (по умолчанию cash)"
+    )
 
 
 class WriteOffRead(BaseModel):
