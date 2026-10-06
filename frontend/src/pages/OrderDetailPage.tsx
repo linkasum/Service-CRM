@@ -432,7 +432,7 @@ const OrderDetailPage: React.FC = () => {
         service_name: serviceName,
         price_at_order: values.price || servicePrice,
         quantity: values.quantity || 1,
-        warranty_days: values.warranty_days || 30,
+        warranty_days: values.warranty_days ?? 30,
         comment: values.comment,
       }, { headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') } })
       message.success('Услуга добавлена')

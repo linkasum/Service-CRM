@@ -82,6 +82,12 @@ def print_document_html(
     # Получить данные компании
     company = session.exec(select(CompanySettings)).first()
     
+    # Эффективная гарантия для печати: максимум по услугам, иначе поле заказа, иначе 30
+    warranty_for_print = max(
+        (si.warranty_days if si.warranty_days is not None else 30 for si in order.service_items),
+        default=(order.warranty_days if order.warranty_days is not None else 30),
+    )
+
     # Подготовить контекст переменных
     ctx = {
         "order_id": str(order.id),
@@ -103,7 +109,7 @@ def print_document_html(
         "order_date": order.created_at.strftime("%d.%m.%Y") if order.created_at else "",
         "order_status": order.status or "",
         "issued_at": order.issued_at.strftime("%d.%m.%Y %H:%M") if order.issued_at else "—",
-        "warranty_days": str(order.warranty_days or 30),
+        "warranty_days": str(warranty_for_print),
         "diagnostic_act_text": order.diagnostic_act_text or "Не указаны",
         "now": datetime.now().strftime("%d.%m.%Y"),
         "print_time": datetime.now().strftime("%H:%M"),
@@ -170,7 +176,7 @@ def print_document_html(
     # Для work_act — одна строка с общей суммой
     if template_type == "work_act":
         service_names = ", ".join(si.service_name for si in order.service_items) if order.service_items else (order.complaint or "Ремонт")
-        max_warranty = max((si.warranty_days or 30 for si in order.service_items), default=30)
+        max_warranty = warranty_for_print
         total = order.total_cost or 0
         items_rows.append(
             f'<tr><td>1</td>'
@@ -192,7 +198,7 @@ def print_document_html(
                 items_rows.append(
                     f'<tr><td>{idx}</td>'
                     f'<td>{si.service_name or "Услуга"}</td>'
-                    f'<td style="text-align:right">{si.warranty_days or 30}</td>'
+                    f'<td style="text-align:right">{si.warranty_days if si.warranty_days is not None else 30}</td>'
                     f'<td style="text-align:right">{price:.2f}</td>'
                     f'<td style="text-align:right">0.00</td>'
                     f'<td style="text-align:right">{qty}</td>'
@@ -210,7 +216,7 @@ def print_document_html(
                 items_rows.append(
                     f'<tr><td>{idx}</td>'
                     f'<td>{part_name}</td>'
-                    f'<td style="text-align:right">{order.warranty_days or 30}</td>'
+                    f'<td style="text-align:right">{warranty_for_print}</td>'
                     f'<td style="text-align:right">{price:.2f}</td>'
                     f'<td style="text-align:right">0.00</td>'
                     f'<td style="text-align:right">{qty}</td>'

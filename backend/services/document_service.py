@@ -361,6 +361,12 @@ class DocumentService:
             "Сумма, ₽",
         ]
 
+        # Эффективная гарантия: максимум по услугам, иначе поле заказа, иначе 30
+        warranty_for_print = max(
+            (svc.warranty_days if svc.warranty_days is not None else 30 for svc in (order.service_items or [])),
+            default=(order.warranty_days if order.warranty_days is not None else 30),
+        )
+
         # Собираем строки: запчасти + услуги
         work_rows = []
         row_num = 1
@@ -373,7 +379,7 @@ class DocumentService:
                     str(row_num),
                     f"📦 {part_name}",
                     "—",
-                    str(order.warranty_days or 30),
+                    str(warranty_for_print),
                     f"{part.price_at_order:.2f}",
                     "0.00",
                     str(part.quantity),
@@ -389,7 +395,7 @@ class DocumentService:
                     str(row_num),
                     f"🔧 {svc.service_name}",
                     "—",
-                    str(order.warranty_days or 30),
+                    str(warranty_for_print),
                     f"{svc.price_at_order:.2f}",
                     "0.00",
                     str(svc.quantity),
@@ -964,7 +970,12 @@ class DocumentService:
             "issued_at": order.issued_at.strftime("%d.%m.%Y %H:%M")
             if order.issued_at
             else "—",
-            "warranty_days": str(order.warranty_days or 0),
+            "warranty_days": str(
+                max(
+                    (svc.warranty_days if svc.warranty_days is not None else 30 for svc in (order.service_items or [])),
+                    default=(order.warranty_days if order.warranty_days is not None else 0),
+                )
+            ),
             "diagnostic_act_text": order.diagnostic_act_text or "Не указаны",
             "now": datetime.now().strftime("%d.%m.%Y"),
             "print_time": datetime.now().strftime("%H:%M"),
