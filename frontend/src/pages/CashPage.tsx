@@ -201,7 +201,7 @@ const CashPage: React.FC = () => {
           transaction_type: txType,
           amount: values.amount,
           order_id: values.order_id,
-          payment_method: values.payment_method || 'cash',
+          payment_method: values.payment_method,
           comment: values.comment,
           is_parts: values.is_parts || false,
         })
@@ -606,7 +606,7 @@ const CashPage: React.FC = () => {
           <Form.Item label="Сумма" name="amount" rules={[{required: true, message: 'Введите сумму'}]}>
             <InputNumber min={txType === 'adjustment' ? undefined : 0.01} style={{width: '100%'}} placeholder="0.00" />
           </Form.Item>
-          <Form.Item label="Способ оплаты" name="payment_method" initialValue="cash">
+          <Form.Item label="Способ оплаты" name="payment_method" rules={[{required: true, message: 'Выберите способ оплаты'}]}>
             <Select>
               <Select.Option value="cash">💵 Наличные</Select.Option>
               <Select.Option value="card">💳 Безналичные</Select.Option>

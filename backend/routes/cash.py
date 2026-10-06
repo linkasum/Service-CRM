@@ -405,8 +405,13 @@ def create_transaction(
     if tx_type in (TransactionType.expense, TransactionType.cashout, TransactionType.adjustment) and amount > 0:
         amount = -amount
     
-    payment_method_str = data.get("payment_method", "cash")
-    pm = PaymentMethod(payment_method_str) if payment_method_str in ("cash", "card") else PaymentMethod.cash
+    payment_method_str = data.get("payment_method")
+    if payment_method_str not in ("cash", "card"):
+        raise HTTPException(
+            status_code=400,
+            detail="Укажите способ оплаты: cash (наличные) или card (безналичные)",
+        )
+    pm = PaymentMethod(payment_method_str)
 
     tx = CashTransaction(
         shift_id=shift.id,

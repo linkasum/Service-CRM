@@ -56,7 +56,7 @@ app = FastAPI(
 # CORS для фронтенда
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:80", "http://127.0.0.1:5173", "http://127.0.0.1:80"],
+    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:80", "http://127.0.0.1:5173", "http://127.0.0.1:80", "https://onservis.cc", "https://www.onservis.cc", "https://onservis.mooo.com", "https://onservis.mooo.com:8443", "http://95.31.6.172", "http://95.31.6.172:58294"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
